@@ -1,0 +1,24 @@
+Photo Studio @VERSION@
+for Kerbal Space Program 1.12.x
+
+Your craft in a photographer's studio: a white cyclorama, a green screen or a showroom with a polished floor. A camera that goes round it, a turntable, and pictures larger than the screen.
+
+INSTALL
+  Copy both folders in this download's GameData (Keystone and PhotoStudio) into your KSP's
+  GameData folder, and start the game. Keystone is the base this mod stands on; one copy
+  serves every mod that uses it. To remove the mod, delete the PhotoStudio folder.
+
+USE
+  In the assembly building, the hangar, or in flight, press Option-P on a Mac (Alt-P
+  elsewhere), or open the Keystone window (the keystone button on the toolbar, or Option-K /
+  Alt-K), turn to Photo Studio and press "Open the studio". Right mouse button: turn round
+  the craft. Wheel: nearer and further. Middle button: raise or lower the view.
+  Option-Return (Alt-Return) takes a picture, into the game's Screenshots folder.
+  Option-P again, or Escape, closes the studio and puts everything back as it was.
+  In flight the game is paused while the studio is open.
+
+WHERE IT WORKS
+  Made and tried on a Mac. It uses only the game's own shaders, so nothing in it is meant
+  for one system only, but nobody has run it on Windows or Linux yet.
+
+Everything else: https://github.com/IshiakiZ/ksp-photo-studio
