@@ -1,6 +1,7 @@
 # Pictures
 
-**Option-Return** (Alt-Return), or **Take a picture** on the mod's page, while the studio is open.
+**Option-Return** or **Option-S** (on Windows **Alt-S**, since Alt-Return never reaches a mod there), or
+**Take a picture** on the mod's page, while the studio is open.
 
 * The picture is drawn afresh for itself, by the same cameras that draw the screen, at the **Size** asked for:
   the screen's, or two, three or four times as wide and high (at most 8192 pixels on its longer side, and

@@ -257,6 +257,7 @@ namespace PhotoStudio
 
             // ---- the lamps that light the craft go out (the studio brings its own), and are looked over again while it is up
             Sweep();
+            NoGlow();
 
             // ---- the light from all round, the reflections and the fog (the studio's own are set for each studio); the shadows' reach
             scene.Surroundings();
@@ -324,6 +325,20 @@ namespace PhotoStudio
             foreach (Light l in UnityEngine.Object.FindObjectsOfType<Light>())
                 if (l != null && l.enabled && (l.cullingMask & lit) != 0 && (root == null || !l.transform.IsChildOf(root.transform))) scene.Enable(l, false);
             sweepAt = Time.unscaledTime + 0.5f;
+        }
+
+        /// <summary>
+        /// The glow the game puts on a part under the pointer (in the editor, on everything that hangs from it as well) held off: it
+        /// is the game's, not the craft's. The game lays it into the parts' own materials, not only round them (that is the
+        /// camera's highlighting, switched off above): so each part is told to take none until the studio is closed. Done every
+        /// frame, before the frame is drawn: the editor puts the glow on at the end of a frame, so none put on while the studio
+        /// was opening is ever seen.
+        /// </summary>
+        void NoGlow()
+        {
+            List<Part> parts = CraftParts;
+            if (parts == null) return;
+            foreach (Part p in parts) scene.NoGlow(p);
         }
 
         /// <summary>
@@ -787,14 +802,15 @@ namespace PhotoStudio
                 float wheel = GameSettings.AXIS_MOUSEWHEEL.GetAxis();
                 if (wheel != 0f) distance *= Mathf.Exp(-wheel * 1.2f);
             }
+            // (the game's camera keys read past the locks: in flight the game's pause, which is the studio's doing, holds them off too)
             if (!Studio.Typing())
             {
-                if (GameSettings.CAMERA_ORBIT_LEFT.GetKey()) heading += 50f * dt;
-                if (GameSettings.CAMERA_ORBIT_RIGHT.GetKey()) heading -= 50f * dt;
-                if (GameSettings.CAMERA_ORBIT_UP.GetKey()) pitch += 35f * dt;
-                if (GameSettings.CAMERA_ORBIT_DOWN.GetKey()) pitch -= 35f * dt;
-                if (GameSettings.ZOOM_IN.GetKey()) distance *= Mathf.Exp(-1.2f * dt);
-                if (GameSettings.ZOOM_OUT.GetKey()) distance *= Mathf.Exp(1.2f * dt);
+                if (GameSettings.CAMERA_ORBIT_LEFT.GetKey(true)) heading += 50f * dt;
+                if (GameSettings.CAMERA_ORBIT_RIGHT.GetKey(true)) heading -= 50f * dt;
+                if (GameSettings.CAMERA_ORBIT_UP.GetKey(true)) pitch += 35f * dt;
+                if (GameSettings.CAMERA_ORBIT_DOWN.GetKey(true)) pitch -= 35f * dt;
+                if (GameSettings.ZOOM_IN.GetKey(true)) distance *= Mathf.Exp(-1.2f * dt);
+                if (GameSettings.ZOOM_OUT.GetKey(true)) distance *= Mathf.Exp(1.2f * dt);
             }
             if (Studio.Turning) heading += Studio.Spin * dt;
             pitch = Mathf.Clamp(pitch, -8f, 85f);
@@ -806,12 +822,18 @@ namespace PhotoStudio
         /// Whether something is free of every lock but the studio's own and the game's pause (which in flight locks the camera
         /// too, and is the studio's doing): a settings window under the pointer, say, still holds the mouse off.
         /// </summary>
-        static bool Free(ControlTypes what)
+        static bool Free(ControlTypes what) => (Others() & (ulong)what) == 0;
+
+        /// <summary>Whether every key of the keyboard is held by others, as it is while a box is being typed in.</summary>
+        internal static bool KeyboardHeld => (Others() & (ulong)ControlTypes.KEYBOARDINPUT) == (ulong)ControlTypes.KEYBOARDINPUT;
+
+        /// <summary>What the input locks hold, but the studio's own and the game's pause (in flight the studio pauses the game, and that holds everything).</summary>
+        static ulong Others()
         {
             ulong others = 0;
             foreach (KeyValuePair<string, ulong> held in InputLockManager.lockStack)
                 if (held.Key != Lock && held.Key != "gamePause") others |= held.Value;
-            return (others & (ulong)what) == 0;
+            return others;
         }
 
         /// <summary>Set the camera by hand: heading and pitch in degrees, distance and height in metres (NaN: as it is).</summary>
@@ -842,6 +864,7 @@ namespace PhotoStudio
             if (dirtyAt >= 0f && Time.unscaledTime > dirtyAt) { dirtyAt = -1f; Refit(); }
             if (InFlight) Follow();
             if (Time.unscaledTime > sweepAt) Sweep();
+            NoGlow();
             float k = dt <= 0f ? 1f : 1f - Mathf.Exp(-9f * dt);
             headingNow += (heading - headingNow) * k;
             pitchNow += (pitch - pitchNow) * k;

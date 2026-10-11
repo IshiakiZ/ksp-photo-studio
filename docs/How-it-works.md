@@ -17,7 +17,10 @@ was, so that closing the studio puts every one of them back, last first:
   (they would stand on the studio's floor as poles);
 * the editor's camera is driven by the studio instead of by its own driver; its angle of view is the studio's
   lens, and it is no longer aimed a little to one side to leave room for the parts list (pictures are
-  centred). The glow the editor puts round a part under the pointer is off;
+  centred). The glow the editor puts on a part under the pointer is off: both the glow round it (the
+  camera's highlighting, switched off) and the colour the game lays into the parts' own materials as well,
+  which no camera setting reaches (each part is told to take no glow until the studio is closed, looked
+  over every frame before the frame is drawn, and given back the kind it had);
 * the light from all round (`RenderSettings`) is the studio's, and so is what the parts reflect (the editor
   gives them a picture of the building; the studio gives them one of itself, taken from where the craft
   stands);
@@ -44,7 +47,9 @@ The same, round the craft being flown, with these differences:
   studio is up, since other mods switch their own lamps on and off), and the light from all round is set
   again just before each of the studio's cameras draws (other mods set their own every frame);
 * the flight camera is held (its own driver stops) and placed by the studio;
-* the floor lies level under the craft across the planet's up where the craft is.
+* the floor lies level under the craft across the planet's up where the craft is;
+* the studio's keys are read past the input locks: the game's pause holds every key off, the modifier key and
+  the camera keys included, and the studio's own lock holds off everything but the camera.
 
 ![The test rocket on the launch pad; the same rocket in the showroom, the game paused; the pad again after the studio is closed](../src/PhotoStudio/img/studio-flight.jpg)
 

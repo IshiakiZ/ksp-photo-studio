@@ -147,7 +147,7 @@ namespace PhotoStudio
             if (stage != null) return "open";
             stage = Stage.Open(kind.Value, out string why);
             if (stage == null) { Tell(why); return why; }
-            Tell(Named[kind.Value] + ": right button to turn, wheel to come nearer, middle button to raise.  " + Key + "-1, 2, 3: the studios; " + Key + "-T: turntable; " + Key + "-Return: a picture; " + Key + "-P: close.", 8f);
+            Tell(Named[kind.Value] + ": right button to turn, wheel to come nearer, middle button to raise.  " + Key + "-1, 2, 3: the studios; " + Key + "-T: turntable; " + Key + "-" + Shutter + ": a picture; " + Key + "-P: close.", 8f);
             return "open";
         }
 
@@ -161,6 +161,10 @@ namespace PhotoStudio
 
         static string Key => Application.platform == RuntimePlatform.OSXPlayer ? "Option" : "Alt";
 
+        /// <summary>The key that takes a picture, with Key held: Return, or S. (On Windows Alt-Return never reaches a mod: the game's window
+        /// keeps it for itself. So S is the one named there; both work everywhere.)</summary>
+        static string Shutter => Application.platform == RuntimePlatform.WindowsPlayer ? "S" : "Return";
+
         void Tell(string text, float seconds = 4f)
         {
             said = text ?? "";
@@ -171,8 +175,10 @@ namespace PhotoStudio
         /// <summary>Whether something is being typed into (a box of the game's or of a settings window): then the keys are not the studio's.</summary>
         public static bool Typing()
         {
-            // (a box being typed in locks every key of the keyboard; the studio's own lock, and others, lock only some: "any of them locked" would be always)
-            if (GUIUtility.keyboardControl != 0 || InputLockManager.IsAllLocked(ControlTypes.KEYBOARDINPUT)) return true;
+            // (a box being typed in locks every key of the keyboard; the studio's own lock, and others, lock only some: "any of them locked" would be always.
+            // While the studio is open the game's pause is passed over as well: in flight the studio pauses the game, and that locks every key)
+            bool open = Running != null && Running.stage != null;
+            if (GUIUtility.keyboardControl != 0 || (open ? Stage.KeyboardHeld : InputLockManager.IsAllLocked(ControlTypes.KEYBOARDINPUT))) return true;
             GameObject chosen = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             return chosen != null && (chosen.GetComponent("TMP_InputField") != null || chosen.GetComponent<UnityEngine.UI.InputField>() != null);
         }
@@ -200,7 +206,9 @@ namespace PhotoStudio
                 Tell("The studio is closed.");
                 return;
             }
-            bool held = GameSettings.MODIFIER_KEY.GetKey();
+            // (read past the locks, as Escape is: in flight the studio's own lock, which holds off everything but the camera, holds the
+            // game's modifier key off too, and none of the studio's keys would work there)
+            bool held = GameSettings.MODIFIER_KEY.GetKey(true);
             if (held && Input.GetKeyDown(KeyCode.P) && !Typing())
             {
                 if (stage == null) Open();
@@ -211,7 +219,7 @@ namespace PhotoStudio
             if (stage.InFlight && Time.frameCount % 15 == 0 && Stage.CinemaCameraOn) { Close(); Tell("The studio closed: Cinema Camera was switched on."); return; }
             if (held && !Typing())
             {
-                if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) Shoot();
+                if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.S)) Shoot();
                 // (the studios by number, and the turntable, without opening the settings window)
                 if (Input.GetKeyDown(KeyCode.Alpha1)) kind.Value = 0;
                 if (Input.GetKeyDown(KeyCode.Alpha2)) kind.Value = 1;
@@ -316,7 +324,7 @@ namespace PhotoStudio
                 if (GUILayout.Button(shooting ? "Taking..." : "Take a picture")) Shoot();
             }
             GUILayout.EndHorizontal();
-            string about = stage == null ? "" : "Right button: turn round the craft and up and down. Wheel: nearer and further. Middle button: raise and lower the view. " + Key + "-1, 2 and 3: the white studio, the green screen, the showroom. " + Key + "-T: the turntable. " + Key + "-Return: a picture. " + Key + "-P or Escape: close.";
+            string about = stage == null ? "" : "Right button: turn round the craft and up and down. Wheel: nearer and further. Middle button: raise and lower the view. " + Key + "-1, 2 and 3: the white studio, the green screen, the showroom. " + Key + "-T: the turntable. " + Key + "-" + Shutter + ": a picture. " + Key + "-P or Escape: close.";
             if (stage != null && stage.Shading) about += "\nWorking out the shadow under the craft...";
             if (stage != null && clear.Value && stage.Kind == 2) about += "\n(The showroom's pictures always have their background: its floor's reflection is part of the picture.)";
             if (!string.IsNullOrEmpty(lastPicture)) about += "\nLast picture: " + System.IO.Path.GetFileName(lastPicture);

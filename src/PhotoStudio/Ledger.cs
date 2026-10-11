@@ -47,6 +47,19 @@ namespace PhotoStudio
             thing.forceRenderingOff = true;
         }
 
+        /// <summary>A part that takes no glow of the game's under the pointer (the kind of glow it took is put back), and any it has now put out.</summary>
+        public void NoGlow(Part part)
+        {
+            if (part == null) return;
+            if (part.highlightType != Part.HighlightType.Disabled)
+            {
+                Part.HighlightType was = part.highlightType;
+                Add(() => { if (part != null && part.highlightType == Part.HighlightType.Disabled) part.SetHighlightType(was); });
+                part.highlightType = Part.HighlightType.Disabled;
+            }
+            if (part.HighlightActive) part.SetHighlight(false, false);
+        }
+
         /// <summary>What a camera draws.</summary>
         public void Mask(Camera camera, int mask)
         {

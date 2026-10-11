@@ -13,12 +13,13 @@ USE
   elsewhere), or open the Keystone window (the keystone button on the toolbar, or Option-K /
   Alt-K), turn to Photo Studio and press "Open the studio". Right mouse button: turn round
   the craft. Wheel: nearer and further. Middle button: raise or lower the view.
-  Option-Return (Alt-Return) takes a picture, into the game's Screenshots folder.
+  Option-Return or Option-S (Alt-S on Windows) takes a picture, into the game's Screenshots folder.
   Option-P again, or Escape, closes the studio and puts everything back as it was.
   In flight the game is paused while the studio is open.
 
 WHERE IT WORKS
-  Made and tried on a Mac. It uses only the game's own shaders, so nothing in it is meant
-  for one system only, but nobody has run it on Windows or Linux yet.
+  Made and tried on a Mac, and tried on Windows 11 (Direct3D 11): the studios, pictures and
+  keys, in the assembly building and in flight. It uses only the game's own shaders, so
+  nothing in it is meant for one system only; nobody has run it on Linux yet.
 
 Everything else: https://github.com/IshiakiZ/ksp-photo-studio

@@ -4,11 +4,21 @@
 
 * **Mac:** made and tried here (macOS, OpenGL), with TUFX, Natural Light, Scatterer, EVE and Waterfall
   installed.
-* **Windows and Linux:** everything in the mod is drawn with the game's own shaders (`KSP/Unlit` and the
-  game's see-through particle shader) and lamps, from shapes the mod works out itself. There is no shader of
-  its own and nothing written for OpenGL alone, so it should work the same on Direct3D (Windows) and on Linux.
-  **It has not been run on either**: there was no Windows or Linux computer to try it on. Depth of field is
-  Keystone's lens, which on Windows works only where TUFX is installed.
+* **Windows:** tried on Windows 11 (KSP 1.12.5, Direct3D 11, an NVIDIA GeForce RTX 4080 SUPER) on
+  2026-10-10, in the assembly building and in flight on the launch pad: the white studio, the green
+  screen and the showroom; pictures twice the screen's size saved by the page's button and by Alt-S; the keys
+  pressed in the game's window (Alt-P to open and close, Alt-1 and Alt-2, Alt-S, Escape, the arrow keys to
+  turn the camera); no glow with the pointer on the craft, on the screen or in the pictures; no input lock
+  left after closing, and the editor's own glow back. With the game started on OpenGL (`-force-glcore`) the
+  showroom drew, and Keystone's lens loaded for depth of field. Found there and mended (true on a Mac too):
+  the glow the game lays into the parts' materials under the pointer showed in the studio and its pictures;
+  Alt-Return never reaches a mod on Windows (Alt-S does it now, everywhere); in flight none of the studio's
+  keys worked, the game's pause, which the studio sets, holding them all off. Later that day, in the hangar
+  with the Aeris 4A: the turntable on and off with Alt-T, and a see-through picture four times the screen's size
+  (5120 by 2880, 91% of it clear, the soft shadow under the plane kept) taken with Alt-S.
+* **Linux:** everything in the mod is drawn with the game's own shaders (`KSP/Unlit` and the game's
+  see-through particle shader) and lamps, from shapes the mod works out itself, with nothing written for one
+  system alone. **It has not been run there.**
 
 ## What was tried
 
@@ -20,8 +30,9 @@ the game's shadow settings, input locks, what is hidden, how many objects there 
 the game moves by itself). The studio left open while: changing studio, loading another craft, leaving the
 editor, launching, and a new build of the mod being swapped in.
 
-All of that was done through the game's remote control (the AI Bridge): **no person has yet pressed the keys
-or dragged the mouse** in the studio.
+All of that was done through the game's remote control (the AI Bridge). On Windows the keys were pressed in
+the game's own window as well (by a program at the keyboard, not by a person): **no person has yet pressed
+the keys or dragged the mouse** in the studio.
 
 ## Limits
 

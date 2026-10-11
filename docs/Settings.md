@@ -28,7 +28,7 @@ show the whole craft from the side it is looking from) and **Take a picture**.
 | --- | --- |
 | **Option-P** (Alt-P) | open or close the studio (in the assembly building, the hangar, or in flight) |
 | **Escape** | close the studio (the game's menu does not open as well) |
-| **Option-Return** (Alt-Return) | take a picture |
+| **Option-Return** or **Option-S** (Alt-S on Windows) | take a picture |
 | **Option-1**, **2**, **3** | the white studio, the green screen, the showroom |
 | **Option-T** | the turntable on or off |
 | right mouse button, held | turn round the craft, and up and down |

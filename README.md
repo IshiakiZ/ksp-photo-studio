@@ -21,7 +21,8 @@ toolbar, or Option-K), turn to **Photo Studio** and press **Open the studio**.
 
 * **Right mouse button**: turn round the craft, and up and down. **Wheel**: nearer and further. **Middle
   button**: raise or lower the view. The game's camera keys work too.
-* **Option-Return** (Alt-Return): take a picture. It goes into the game's `Screenshots` folder as a PNG.
+* **Option-Return** or **Option-S** (on Windows **Alt-S**: Alt-Return never reaches a mod there): take a
+  picture. It goes into the game's `Screenshots` folder as a PNG.
 * **Option-1, 2, 3**: the white studio, the green screen, the showroom. **Option-T**: the turntable.
 * **Option-P** or **Escape**: close the studio.
 
@@ -35,10 +36,18 @@ strength, the screen's colour and the showroom floor's gloss.
 ## Good to know
 
 * Everything in it is drawn with the game's own shaders and lights, from shapes worked out by the mod: no
-  shader of its own and nothing meant for one system only. Made and tried on a Mac; **not yet run on Windows
-  or Linux**. (Depth of field uses Keystone's lens, which on Windows needs TUFX.)
+  shader of its own and nothing meant for one system only. (Depth of field is Keystone's lens.)
 * While the studio is open in the editor its picking and moving of parts is held off and its panels are put
-  away; saving, loading and launching still work. In flight the game is paused while the studio is open.
+  away; saving, loading and launching still work. In flight the game is paused while the studio is open. The
+  game's glow on a part under the pointer is held off while the studio is open, so it is never in a picture.
+
+## Where it works
+
+| System | |
+| --- | --- |
+| Mac | Made and tried here (KSP 1.12.5, OpenGL). |
+| Windows | Tried on Windows 11 (KSP 1.12.5, Direct3D 11), in the assembly building and in flight: the three studios, pictures saved by the page's button and by Alt-S, the keys (Alt-P, Alt-1 and 2, Alt-S, Escape, the arrow keys), no glow with the pointer on the craft, and after closing no input lock left and the game's own glow back. With the game started on OpenGL (`-force-glcore`), the showroom and Keystone's lens. Then in the hangar with a plane: the turntable (Alt-T), and a see-through picture four times the screen (5120 x 2880, its background clear and the plane's soft shadow kept). |
+| Linux | **Never run.** |
 
 More: [the studios](docs/The-studios.md),
 [settings](docs/Settings.md),
