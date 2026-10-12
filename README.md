@@ -12,7 +12,7 @@ For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ks
 
 ## Install
 
-Copy the `Keystone` and `PhotoStudio` folders from the download's `GameData` into your KSP `GameData`.
+Copy the `Keystone` and `PhotoStudio` folders from the download into your KSP `GameData`.
 
 ## Use
 
@@ -55,3 +55,7 @@ More: [the studios](docs/The-studios.md),
 [how it works](docs/How-it-works.md),
 [limits](docs/Limits.md),
 [building it yourself](docs/Building.md).
+
+## Licence
+
+[CC BY 4.0](LICENSE): use it, change it and pass it on as you like, as long as you credit Ishiaki and link back here.

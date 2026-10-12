@@ -4,7 +4,7 @@ for Kerbal Space Program 1.12.x
 Your craft in a photographer's studio: a white cyclorama, a green screen or a showroom with a polished floor. A camera that goes round it, a turntable, and pictures larger than the screen.
 
 INSTALL
-  Copy both folders in this download's GameData (Keystone and PhotoStudio) into your KSP's
+  Copy both folders in this download (Keystone and PhotoStudio) into your KSP's
   GameData folder, and start the game. Keystone is the base this mod stands on; one copy
   serves every mod that uses it. To remove the mod, delete the PhotoStudio folder.
 
