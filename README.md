@@ -1,61 +1,42 @@
 # Photo Studio
 
-Your craft in a photographer's studio: a seamless white cyclorama, a green screen, or a dark showroom with a
-polished floor that reflects it. A camera that goes round the craft, a turntable, and pictures larger than the
-screen, with a see-through background if you want one. In the assembly building and the hangar (the building
-and its crew go away while the studio is up), and in flight round the craft you are flying, with the game
-paused. Closing the studio puts everything back exactly as it was.
-
-For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone), a separate download ([its page on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
+Your craft in a photographer's studio: a seamless white backdrop, a green screen, or a dark showroom with a polished
+floor. A camera that goes round the craft, a turntable, and pictures up to four times the size of the screen, with a
+see-through background if you want one. In the assembly building, in the hangar and in flight.
 
 ![The same plane in the white studio, before the green screen and in the showroom](src/PhotoStudio/img/studio-plane.jpg)
 
+For Kerbal Space Program 1.12.x. **Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone)**, a separate download
+([on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
+
 ## Install
 
-Install [Keystone](https://github.com/IshiakiZ/ksp-keystone) first: it is a download of its own, and its `Keystone` folder goes into your KSP
-`GameData`. Then copy the `PhotoStudio` folder from this mod's download into `GameData` beside it.
+Copy the `PhotoStudio` folder from the download into your KSP's `GameData`, beside `Keystone`.
 
 ## Use
 
-Press **Option-P** (Alt-P on Windows and Linux), or open the Keystone window (the keystone button on the
-toolbar, or Option-K), turn to **Photo Studio** and press **Open the studio**.
+Press **Alt-P** (Option-P on a Mac), or press **Open the studio** on the mod's page in the Keystone window.
 
-* **Right mouse button**: turn round the craft, and up and down. **Wheel**: nearer and further. **Middle
-  button**: raise or lower the view. The game's camera keys work too.
-* **Option-Return** or **Option-S** (on Windows **Alt-S**: Alt-Return never reaches a mod there): take a
-  picture. It goes into the game's `Screenshots` folder as a PNG.
-* **Option-1, 2, 3**: the white studio, the green screen, the showroom. **Option-T**: the turntable.
-* **Option-P** or **Escape**: close the studio.
+* **Right mouse button** turns round the craft, the **wheel** goes nearer and further, the **middle button** raises
+  and lowers the view.
+* **Alt-S** takes a picture. It goes into the game's `Screenshots` folder as a PNG.
+* **Alt-1, 2, 3:** the white studio, the green screen, the showroom. **Alt-T:** the turntable. **Alt-P** or
+  **Escape** closes the studio.
 
-On the mod's page: which **studio**, the **lens** (18 to 200 mm) and **aperture** (depth of field), which side
-the **key light** comes from, a **turntable**, the picture's **size** (up to four times the screen's), a
-**see-through background** (white studio and green screen), the white backdrop's brightness, the shadow's
-strength, the screen's colour and the showroom floor's gloss.
-
-![Pictures taken with a see-through background, laid over a chequerboard](src/PhotoStudio/img/studio-clear.jpg)
+The mod's page has the lens, the aperture, the side the light comes from, the picture's size and the see-through
+background.
 
 ## Good to know
 
-* Everything in it is drawn with the game's own shaders and lights, from shapes worked out by the mod: no
-  shader of its own and nothing meant for one system only. (Depth of field is Keystone's lens.)
-* While the studio is open in the editor its picking and moving of parts is held off and its panels are put
-  away; saving, loading and launching still work. In flight the game is paused while the studio is open. The
-  game's glow on a part under the pointer is held off while the studio is open, so it is never in a picture.
+* Closing the studio puts everything back as it was. In flight the game is paused while the studio is open; in the
+  assembly building and the hangar, parts cannot be picked up meanwhile.
 
-## Where it works
+## Works on
 
-| System | |
-| --- | --- |
-| Mac | Made and tried here (KSP 1.12.5, OpenGL). |
-| Windows | Tried on Windows 11 (KSP 1.12.5, Direct3D 11), in the assembly building and in flight: the three studios, pictures saved by the page's button and by Alt-S, the keys (Alt-P, Alt-1 and 2, Alt-S, Escape, the arrow keys), no glow with the pointer on the craft, and after closing no input lock left and the game's own glow back. With the game started on OpenGL (`-force-glcore`), the showroom and Keystone's lens. Then in the hangar with a plane: the turntable (Alt-T), and a see-through picture four times the screen (5120 x 2880, its background clear and the plane's soft shadow kept). |
-| Linux | **Never run.** |
+Windows 11 (Direct3D 11 and OpenGL) and Mac: tried. Linux: never run.
 
-More: [the studios](docs/The-studios.md),
-[settings](docs/Settings.md),
-[pictures](docs/Pictures.md),
-[how it works](docs/How-it-works.md),
-[limits](docs/Limits.md),
-[building it yourself](docs/Building.md).
+**More:** [the long description](docs/The-long-description.md) (everything in full, and what
+was tried on each system) and the rest of the [wiki](docs/README.md).
 
 ## Licence
 
