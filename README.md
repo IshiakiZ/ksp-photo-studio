@@ -6,13 +6,14 @@ screen, with a see-through background if you want one. In the assembly building 
 and its crew go away while the studio is up), and in flight round the craft you are flying, with the game
 paused. Closing the studio puts everything back exactly as it was.
 
-For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone), which comes in the download.
+For Kerbal Space Program 1.12.x. Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone), a separate download ([its page on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
 
 ![The same plane in the white studio, before the green screen and in the showroom](src/PhotoStudio/img/studio-plane.jpg)
 
 ## Install
 
-Copy the `Keystone` and `PhotoStudio` folders from the download into your KSP `GameData`.
+Install [Keystone](https://github.com/IshiakiZ/ksp-keystone) first: it is a download of its own, and its `Keystone` folder goes into your KSP
+`GameData`. Then copy the `PhotoStudio` folder from this mod's download into `GameData` beside it.
 
 ## Use
 
