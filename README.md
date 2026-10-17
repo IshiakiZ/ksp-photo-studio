@@ -6,6 +6,8 @@ see-through background if you want one. In the assembly building, in the hangar 
 
 ![The same plane in the white studio, before the green screen and in the showroom](src/PhotoStudio/img/studio-plane.jpg)
 
+![A plane on the turntable in the dark showroom](src/PhotoStudio/img/photo-studio-turntable.gif)
+
 For Kerbal Space Program 1.12.x. **Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone)**, a separate download
 ([on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
 

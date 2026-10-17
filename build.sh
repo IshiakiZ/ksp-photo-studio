@@ -34,14 +34,25 @@ if [ -f src/PhotoStudio/needs.txt ]; then
   done < src/PhotoStudio/needs.txt
 fi
 
+# A companion library for the Harmony mod, where this mod has one (src/PhotoStudioHarmony): built against this mod and against
+# Harmony, only where Harmony is installed in the game, and loaded by the game only where it is.
+HARMONY="$KSP_DIR/GameData/000_Harmony/0Harmony.dll"
+companion() {  # companion <folder the mod's own library is in>
+  [ -d src/PhotoStudioHarmony ] || return 0
+  if [ -f "$HARMONY" ]; then WITH="$KEYSTONE:$1/PhotoStudio.dll:$HARMONY" compile "$1/PhotoStudioHarmony.dll" "" src/PhotoStudioHarmony
+  else rm -f "$1/PhotoStudioHarmony.dll"; echo "left out: PhotoStudioHarmony (Harmony is not installed here to build it against)"; fi
+}
+
 case "$MODE" in
   check)
     WITH="$KEYSTONE" compile "$TMP/PhotoStudio.dll" "" src/PhotoStudio
+    companion "$TMP"
     echo "ok: compiles"
     ;;
   dist|install)
     mkdir -p "$OUT"
     WITH="$KEYSTONE" compile "$OUT/PhotoStudio.dll" "" src/PhotoStudio
+    companion "$OUT"
     # (the mod's own shaders, if it has any: made by tools/shaderpack/make_bundle.py and kept ready made in src/PhotoStudio/Shaders)
     if ls src/PhotoStudio/Shaders/*.bundle >/dev/null 2>&1; then mkdir -p "$OUT/PluginData"; cp src/PhotoStudio/Shaders/*.bundle "$OUT/PluginData/"; fi
     # (and anything else it keeps in src/PhotoStudio/PluginData: a craft file, say)
@@ -49,6 +60,8 @@ case "$MODE" in
     if [ "$MODE" = dist ]; then echo "ok: built into $OUT"; exit 0; fi
     mkdir -p "$KSP_DIR/GameData/PhotoStudio"
     cp "$OUT/PhotoStudio.dll" "$KSP_DIR/GameData/PhotoStudio/"
+    rm -f "$KSP_DIR/GameData/PhotoStudio/PhotoStudioHarmony.dll"
+    [ -f "$OUT/PhotoStudioHarmony.dll" ] && cp "$OUT/PhotoStudioHarmony.dll" "$KSP_DIR/GameData/PhotoStudio/"
     if [ -d "$OUT/PluginData" ]; then mkdir -p "$KSP_DIR/GameData/PhotoStudio/PluginData"; cp -R "$OUT/PluginData/." "$KSP_DIR/GameData/PhotoStudio/PluginData/"; fi
     echo "ok: Photo Studio installed to $KSP_DIR/GameData/PhotoStudio (restart KSP to load it; it needs Keystone there too)"
     ;;
