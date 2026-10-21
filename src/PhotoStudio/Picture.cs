@@ -69,6 +69,36 @@ namespace PhotoStudio
             }
         }
 
+        /// <summary>
+        /// (Since 0.2.0.) One small picture of the studio as it is, for the turntable's loop: so wide (its height as the screen's
+        /// shape has it), its edges smoothed, as rows of red, green and blue bytes from the bottom up.
+        /// </summary>
+        public static byte[] Grab(Stage stage, int width, out int height)
+        {
+            height = Mathf.Max(2, Mathf.RoundToInt(width * Screen.height / (float)Mathf.Max(1, Screen.width)));
+            int samples = QualitySettings.antiAliasing == 0 && !stage.Eye.allowMSAA ? 1 : 8;
+            RenderTexture active = RenderTexture.active, drawn = null, flat = null;
+            Texture2D picture = null;
+            try
+            {
+                drawn = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default) { antiAliasing = samples, name = "Photo Studio loop" };
+                drawn.Create();
+                flat = samples > 1 ? new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default) { name = "Photo Studio loop, read" } : drawn;
+                if (samples > 1) flat.Create();
+                Draw(stage.Back, drawn);
+                Draw(stage.Eye, drawn, stage);
+                picture = Read(drawn, flat, TextureFormat.RGB24);
+                return picture.GetRawTextureData();
+            }
+            finally
+            {
+                RenderTexture.active = active;
+                if (picture != null) UnityEngine.Object.Destroy(picture);
+                if (flat != null && flat != drawn) { flat.Release(); UnityEngine.Object.Destroy(flat); }
+                if (drawn != null) { drawn.Release(); UnityEngine.Object.Destroy(drawn); }
+            }
+        }
+
         /// <summary>One camera's picture drawn into a target of ours, as it would be on the screen.</summary>
         static void Draw(Camera camera, RenderTexture into, Stage lensFor = null)
         {

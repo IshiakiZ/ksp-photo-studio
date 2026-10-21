@@ -96,6 +96,43 @@ namespace PhotoStudio
             moved.Clear();
         }
 
+        /// <summary>A thing there is to look at alone: its name, how far off it is and how big.</summary>
+        public struct Thing { public string Name, Show; public float Far, Size; }
+
+        /// <summary>
+        /// The things nearest the camera to look at alone, for the mod's page: each craft in physics (looked at with every craft and
+        /// only the air round them), and each of the space centre's buildings (the game's own buildings, by their component: the
+        /// rest of the ground is one tree with the whole planet).
+        /// </summary>
+        public static List<Thing> Near(int most)
+        {
+            Camera cam = FlightCamera.fetch != null ? FlightCamera.fetch.mainCamera : Camera.main;
+            Vector3 from = cam != null ? cam.transform.position : Vector3.zero;
+            var all = new List<Thing>();
+            if (HighLogic.LoadedSceneIsFlight)
+                foreach (Vessel v in FlightGlobals.VesselsLoaded)
+                {
+                    if (v == null || v.packed) continue;
+                    all.Add(new Thing { Name = "air", Show = v.GetDisplayName() + " (every craft, the ground taken away)", Far = Vector3.Distance((Vector3)v.CoMD, from), Size = v.vesselSize.magnitude });
+                }
+            foreach (DestructibleBuilding b in UnityEngine.Object.FindObjectsOfType<DestructibleBuilding>())
+            {
+                if (b == null || !b.gameObject.activeInHierarchy) continue;
+                Bounds box = default(Bounds);
+                bool any = false;
+                foreach (Renderer r in b.GetComponentsInChildren<Renderer>())
+                {
+                    if (r == null || !r.enabled) continue;
+                    if (!any) { box = r.bounds; any = true; } else box.Encapsulate(r.bounds);
+                }
+                if (!any) continue;
+                all.Add(new Thing { Name = b.name, Show = b.name, Far = Vector3.Distance(box.center, from), Size = box.size.magnitude });
+            }
+            all.Sort((a, c) => a.Far.CompareTo(c.Far));
+            if (all.Count > most) all.RemoveRange(most, all.Count - most);
+            return all;
+        }
+
         /// <summary>What there is to name: things with something to draw whose names hold the word, nearest the camera first.</summary>
         public static string Find(string word)
         {

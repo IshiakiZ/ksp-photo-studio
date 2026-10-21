@@ -99,6 +99,39 @@ namespace PhotoStudio
             return t;
         }
 
+        /// <summary>
+        /// (Since 0.2.0.) A slab of concrete, four metres square to its picture: a light warm grey with a broad mottle (a few percent,
+        /// as of curing and wear), fine grain, and the joint round its edge, a dark line a few centimetres wide.
+        /// </summary>
+        public static Texture2D Concrete(Made made)
+        {
+            const int Size = 256;
+            var t = made.Keep(new Texture2D(Size, Size, TextureFormat.RGBA32, true) { name = "Photo Studio concrete", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 8 });
+            var pixels = new Color[Size * Size];
+            var luck = new System.Random(4242);
+            // (the mottle: a coarse grid of random values, smoothly between)
+            const int Coarse = 9;
+            var coarse = new float[Coarse * Coarse];
+            for (int i = 0; i < coarse.Length; i++) coarse[i] = (float)luck.NextDouble();
+            for (int y = 0; y < Size; y++)
+                for (int x = 0; x < Size; x++)
+                {
+                    float fx = x / (float)Size * (Coarse - 1), fy = y / (float)Size * (Coarse - 1);
+                    int ix = Mathf.Min((int)fx, Coarse - 2), iy = Mathf.Min((int)fy, Coarse - 2);
+                    float sx = fx - ix, sy = fy - iy;
+                    sx = sx * sx * (3f - 2f * sx); sy = sy * sy * (3f - 2f * sy);
+                    float m = Mathf.Lerp(Mathf.Lerp(coarse[iy * Coarse + ix], coarse[iy * Coarse + ix + 1], sx), Mathf.Lerp(coarse[(iy + 1) * Coarse + ix], coarse[(iy + 1) * Coarse + ix + 1], sx), sy);
+                    float grain = (float)luck.NextDouble() - 0.5f;
+                    float edge = Mathf.Min(Mathf.Min(x, Size - 1 - x), Mathf.Min(y, Size - 1 - y));
+                    float joint = edge < 0.5f ? 0.62f : edge < 1.5f ? 0.86f : 1f;
+                    float v = (0.62f + 0.05f * (m - 0.5f) + 0.035f * grain) * joint;
+                    pixels[y * Size + x] = new Color(v * 1.02f, v, v * 0.95f, 1f);
+                }
+            t.SetPixels(pixels);
+            t.Apply(true, true);
+            return t;
+        }
+
         /// <summary>A picture that runs from colour to colour along its height (its v, 0 to 1), each colour at the place given.</summary>
         public static Texture2D Ramp(Made made, float[] at, Color[] colours)
         {

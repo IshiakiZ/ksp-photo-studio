@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections;
 using Keystone;
 using UnityEngine;
@@ -27,16 +28,17 @@ namespace PhotoStudio
     [KSPAddon(KSPAddon.Startup.FlightAndEditor, false)]
     public sealed class Studio : MonoBehaviour
     {
-        public const string Version = "0.1.0";
-        public static readonly string[] Studios = { "white", "green screen", "showroom" };
-        static readonly string[] Named = { "white studio", "green screen", "showroom" };
+        public const string Version = "0.2.0";
+        public static readonly string[] Studios = { "white", "green screen", "showroom", "your picture", "outdoors" };
+        static readonly string[] Named = { "white studio", "green screen", "showroom", "your picture", "outdoors" };
+        static readonly string[] Looks = { "soft", "hard", "low-key", "sunset" };
         static readonly string[] Sizes = { "the screen's", "twice", "three times", "four times" };
 
         static Mod mod;
         static Choice kind, size;
         static Slider focal, stop, spin, white, shadow, gloss;
         static Toggle turning, clear, hide;
-        static Choice side;
+        static Choice side, look;
         static Tint screen;
 
         public static float Focal => focal != null ? focal.Value : 50f;
@@ -49,16 +51,23 @@ namespace PhotoStudio
         public static Color ScreenColour => screen != null ? screen.Value : new Color(0f, 0.694f, 0.251f);
         public static bool HideInterface => hide == null || hide.Value;
         public static bool KeyOnRight => side != null && side.Value == 1;
+        /// <summary>(Since 0.2.0.) The light's look in the white studio and your picture: 0 soft, 1 hard, 2 low-key, 3 sunset; outdoors, 3 is a low sun.</summary>
+        public static int LightLook => look != null ? look.Value : 0;
+
+        /// <summary>Its key, as Keystone lists it (the studio's own keys, read only while it is open, are on its page).</summary>
+        static void Keys(Mod mod) => mod.Uses(KeyCode.P, true, "the studio, in the editors");
 
         public static void Setup()
         {
             if (mod != null && Kit.Find("Photo Studio") == mod) return;
             mod = Kit.Register("Photo Studio", Version, "The craft you are building, in a photographer's studio: a white cyclorama, a green screen or a showroom. A camera that goes round it, a turntable, and pictures larger than the screen. In the assembly building and the hangar.");
-            kind = mod.Choice("studio", "Studio", 0, Studios, "White: a seamless white floor and wall with a soft shadow under the craft, lit as products are photographed. Green screen: one even chroma green, no shadow on it, for keying. Showroom: a dark room, a polished floor that reflects the craft, a softbox overhead and strip lights behind.");
+            try { Keys(mod); } catch (Exception) { }             // (for Keystone's page of every key; not with a Keystone older than 0.9.0)
+            kind = mod.Choice("studio", "Studio", 0, Studios, "White: a seamless white floor and wall with a soft shadow under the craft, lit as products are photographed. Green screen: one even chroma green, no shadow on it, for keying. Showroom: a dark room, a polished floor that reflects the craft, a softbox overhead and strip lights behind. Your picture (0.2.0): a picture of your own behind the craft, its soft shadow under it: PNG or JPG files put in GameData/PhotoStudio/PluginData/Backdrops. Outdoors (0.2.0): on a concrete apron under the open sky in sunshine, the craft's shadow cast by the sun.");
             mod.Heading("Camera");
             focal = mod.Slider("focal", "Lens", 50f, 18f, 200f, " mm", 0, "The focal length, as on a camera with film 24 mm high: a short lens sees wide and exaggerates depth, a long one flattens it. 50 to 100 mm is what product photographers use.");
             stop = mod.Slider("stop", "Aperture  f /", 16f, 1.4f, 16f, "", 1, "The lens's f-number, for depth of field: at 16 everything is sharp; open the lens wider (smaller numbers) and what is nearer or further than the craft is blurred, more the closer the camera and the longer the lens. Done by Keystone's lens (on Windows only where TUFX is installed); the craft is kept in focus.");
             side = mod.Choice("side", "Key light from the", 0, new[] { "left", "right" }, "Which side of the picture the main light comes from (and its shadows fall away from); the other lights go round with it.");
+            look = mod.Choice("look", "The light", 0, Looks, "(0.2.0) In the white studio, your picture and outdoors. Soft: a large soft key with fill, top and rim lights, as products are photographed. Hard: one small strong light high to the side and little fill, as bright sun. Low-key: the key from the side and a little behind, no fill, strong lights from behind drawing the outline, the rest dark. Sunset: a low warm key from the side and blue light from the sky above (outdoors: the sun low and warm).");
             turning = mod.Toggle("turntable", "Turntable", false, "The craft turns slowly, as on a photographer's turntable: the camera, the lights and the set stay as they are.");
             spin = mod.Slider("spin", "Turntable speed", 8f, -40f, 40f, " ° a second", 1, "How fast the turntable turns; less than nought, the other way.");
             mod.Heading("Pictures");
@@ -90,6 +99,7 @@ namespace PhotoStudio
             shadow.Changed += Rebuild;
             screen.Changed += Rebuild;
             side.Changed += Rebuild;
+            look.Changed += Rebuild;
             GameEvents.onEditorRestart.Add(Restarted);
             GameEvents.onEditorShipModified.Add(Modified);
             GameEvents.onEditorLoad.Add(Loaded);
@@ -109,6 +119,7 @@ namespace PhotoStudio
             if (shadow != null) shadow.Changed -= Rebuild;
             if (screen != null) screen.Changed -= Rebuild;
             if (side != null) side.Changed -= Rebuild;
+            if (look != null) look.Changed -= Rebuild;
             GameEvents.onEditorRestart.Remove(Restarted);
             GameEvents.onEditorShipModified.Remove(Modified);
             GameEvents.onEditorLoad.Remove(Loaded);
@@ -224,6 +235,8 @@ namespace PhotoStudio
                 if (Input.GetKeyDown(KeyCode.Alpha1)) kind.Value = 0;
                 if (Input.GetKeyDown(KeyCode.Alpha2)) kind.Value = 1;
                 if (Input.GetKeyDown(KeyCode.Alpha3)) kind.Value = 2;
+                if (Input.GetKeyDown(KeyCode.Alpha4)) kind.Value = 3;
+                if (Input.GetKeyDown(KeyCode.Alpha5)) kind.Value = 4;
                 if (Input.GetKeyDown(KeyCode.T)) { turning.Value = !turning.Value; Tell(turning.Value ? "The turntable turns." : "The turntable stops."); }
             }
             try { stage.Steer(); }
@@ -249,6 +262,123 @@ namespace PhotoStudio
             }
         }
 
+        /// <summary>
+        /// (Since 0.2.0.) The turntable's loop: the craft turned once round in 36 steps, a small picture of each (640 wide at the
+        /// most, half the screen's width), written as a GIF that loops, three seconds round, into the game's Screenshots folder:
+        /// for a mod's page or a message. The pictures are taken a frame apart, the GIF made on another thread.
+        /// </summary>
+        public void Loop()
+        {
+            if (stage == null || shooting) return;
+            StartCoroutine(Looping());
+        }
+
+        IEnumerator Looping()
+        {
+            shooting = true;
+            const int Steps = 36;
+            float from = stage.Heading;
+            bool turned = turning.Value;
+            turning.Value = false;
+            int width = Mathf.Clamp(Screen.width / 2, 160, 640), height = 0;
+            var frames = new System.Collections.Generic.List<byte[]>(Steps);
+            string ship = CraftName(), path = null;
+            Tell("Making the loop: turning the craft once round...", 60f);
+            for (int k = 0; k < Steps && stage != null; k++)
+            {
+                stage.Aim(from + 360f * k / Steps, float.NaN, float.NaN, float.NaN, true);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                if (stage == null) break;
+                try { stage.Settle(); frames.Add(Picture.Grab(stage, width, out height)); }
+                catch (Exception ex) { Debug.LogException(ex); break; }
+            }
+            if (stage != null) stage.Aim(from, float.NaN, float.NaN, float.NaN, true);
+            turning.Value = turned;
+            if (frames.Count == Steps && height > 0)
+            {
+                System.IO.Directory.CreateDirectory(Picture.Folder);
+                string name = KSPUtil.SanitizeFilename((string.IsNullOrEmpty(ship) ? "Craft" : ship) + " - turntable - " + DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss"));
+                path = Picture.Folder + name + ".gif";
+                Tell("Making the loop: writing the GIF...", 60f);
+                string to = path; int h = height;
+                var writing = System.Threading.Tasks.Task.Run(() => Gif.Write(to, frames, width, h, 8));
+                while (!writing.IsCompleted) yield return null;
+                if (writing.IsFaulted) { Debug.LogException(writing.Exception); path = null; }
+            }
+            shooting = false;
+            if (path != null) { lastPicture = path; Tell("Saved: " + System.IO.Path.GetFileName(path) + "  (in the game's Screenshots folder)", 6f); Debug.Log("[Photo Studio] loop saved: " + path); }
+            else Tell("The loop could not be made.", 6f);
+        }
+
+        // ---- (since 0.2.0) the player's own pictures, for the studio "your picture"
+
+        /// <summary>Where the player's own pictures go.</summary>
+        public static string BackdropFolder => System.IO.Path.Combine(KSPUtil.ApplicationRootPath, "GameData/PhotoStudio/PluginData/Backdrops");
+
+        static List<string> backdropList = new List<string>();
+        static float backdropListed = -100f;
+        static readonly Dictionary<string, Texture2D> backdropLoaded = new Dictionary<string, Texture2D>();
+
+        /// <summary>The PNG and JPG files there, in order of their names (looked at again every few seconds).</summary>
+        public static List<string> Backdrops()
+        {
+            if (Time.unscaledTime - backdropListed < 3f) return backdropList;
+            backdropListed = Time.unscaledTime;
+            var found = new List<string>();
+            try
+            {
+                // (the folder made the first time it is looked for, so that the player finds it where the page says)
+                if (!System.IO.Directory.Exists(BackdropFolder)) System.IO.Directory.CreateDirectory(BackdropFolder);
+                foreach (string f in System.IO.Directory.GetFiles(BackdropFolder))
+                    {
+                        string e = System.IO.Path.GetExtension(f).ToLowerInvariant();
+                        if (e == ".png" || e == ".jpg" || e == ".jpeg") found.Add(f);
+                    }
+            }
+            catch (Exception) { }
+            found.Sort(StringComparer.OrdinalIgnoreCase);
+            backdropList = found;
+            return found;
+        }
+
+        /// <summary>The picture chosen (kept by name), or the first there is; nothing if there are none.</summary>
+        public static string BackdropPath()
+        {
+            List<string> all = Backdrops();
+            if (all.Count == 0) return null;
+            string kept = mod != null ? mod.Kept("backdrop") : null;
+            foreach (string f in all) if (string.Equals(System.IO.Path.GetFileName(f), kept, StringComparison.OrdinalIgnoreCase)) return f;
+            return all[0];
+        }
+
+        /// <summary>The chosen picture, loaded (once, and kept while the game runs): nothing if there is none or it cannot be read.</summary>
+        public static Texture2D Backdrop()
+        {
+            string path = BackdropPath();
+            if (path == null) return null;
+            if (backdropLoaded.TryGetValue(path, out Texture2D had) && had != null) return had;
+            try
+            {
+                var picture = new Texture2D(2, 2, TextureFormat.RGB24, false) { name = "Photo Studio backdrop " + System.IO.Path.GetFileName(path), wrapMode = TextureWrapMode.Clamp };
+                if (!picture.LoadImage(System.IO.File.ReadAllBytes(path), true)) { Destroy(picture); return null; }
+                backdropLoaded[path] = picture;
+                return picture;
+            }
+            catch (Exception ex) { Debug.Log("[Photo Studio] the picture " + path + " could not be read: " + ex.Message); return null; }
+        }
+
+        void NextBackdrop()
+        {
+            List<string> all = Backdrops();
+            if (all.Count == 0) return;
+            int at = all.IndexOf(BackdropPath());
+            string next = all[(at + 1) % all.Count];
+            mod.Keep("backdrop", System.IO.Path.GetFileName(next));
+            if (stage != null) stage.Build(stage.Kind);
+            Tell("Your picture: " + System.IO.Path.GetFileName(next), 3f);
+        }
+
         /// <summary>A picture, taken once this frame has been drawn.</summary>
         public void Shoot()
         {
@@ -268,7 +398,7 @@ namespace PhotoStudio
         string TakeNow()
         {
             if (stage == null) return null;
-            bool see = clear.Value && stage.Kind != 2;
+            bool see = clear.Value && stage.Kind < 2;
             string ship = CraftName();
             try { stage.Settle(); return Picture.Take(stage, size.Value + 1, see, ship, Named[stage.Kind]); }
             catch (Exception ex) { Debug.LogException(ex); Tell("The picture could not be taken: " + ex.Message, 8f); return null; }
@@ -322,14 +452,57 @@ namespace PhotoStudio
                 if (GUILayout.Button("Close the studio")) { Close(); Tell("The studio is closed."); }
                 if (GUILayout.Button("Frame the craft")) stage.Frame(true);
                 if (GUILayout.Button(shooting ? "Taking..." : "Take a picture")) Shoot();
+                if (GUILayout.Button(new GUIContent("Turntable loop", "The craft turned once round, a small picture at every tenth of a turn, written as a GIF that loops (three seconds round), for a mod's page or a message."))) Loop();
             }
             GUILayout.EndHorizontal();
-            string about = stage == null ? "" : "Right button: turn round the craft and up and down. Wheel: nearer and further. Middle button: raise and lower the view. " + Key + "-1, 2 and 3: the white studio, the green screen, the showroom. " + Key + "-T: the turntable. " + Key + "-" + Shutter + ": a picture. " + Key + "-P or Escape: close.";
+            if (stage != null && stage.Kind == 3)
+            {
+                // (since 0.2.0: the pictures of the player's own, one after another)
+                List<string> backdrops = Backdrops();
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(backdrops.Count == 0 ? "No pictures yet: put PNG or JPG files in GameData/PhotoStudio/PluginData/Backdrops." : "Picture: " + System.IO.Path.GetFileName(BackdropPath() ?? ""), Host.Small);
+                GUILayout.FlexibleSpace();
+                if (backdrops.Count > 1 && GUILayout.Button("Next picture", GUILayout.Width(100f))) NextBackdrop();
+                GUILayout.EndHorizontal();
+            }
+            string about = stage == null ? "" : "Right button: turn round the craft and up and down. Wheel: nearer and further. Middle button: raise and lower the view. " + Key + "-1 to 5: the white studio, the green screen, the showroom, your picture, outdoors. " + Key + "-T: the turntable. " + Key + "-" + Shutter + ": a picture. " + Key + "-P or Escape: close.";
             if (stage != null && stage.Shading) about += "\nWorking out the shadow under the craft...";
             if (stage != null && clear.Value && stage.Kind == 2) about += "\n(The showroom's pictures always have their background: its floor's reflection is part of the picture.)";
+            if (stage != null && clear.Value && stage.Kind >= 3) about += "\n(With your picture behind the craft, or outdoors, the pictures have their background: see-through is for the white studio and the green screen.)";
             if (!string.IsNullOrEmpty(lastPicture)) about += "\nLast picture: " + System.IO.Path.GetFileName(lastPicture);
             if (!string.IsNullOrEmpty(said) && stage == null) about += (about.Length > 0 ? "\n" : "") + said;
             if (about.Length > 0) GUILayout.Label(about, Host.Small);
+            if (HighLogic.LoadedSceneIsFlight && stage == null) AloneControls();
+        }
+
+        // ---- anything in the game looked at alone, where it stands (Exhibit; asked for on 2026-10-11): on the page, in flight
+        System.Collections.Generic.List<Exhibit.Thing> near = new System.Collections.Generic.List<Exhibit.Thing>();
+        float nextNear;
+        string aloneSaid = "";
+
+        void AloneControls()
+        {
+            GUILayout.Space(8f);
+            GUILayout.Label("<b>Anything in the game, alone</b>", Host.Rich);
+            GUILayout.Label("A building, a tower, one lamp, a craft, smoke or cloud: everything else is taken away from the game's own cameras, and it is looked at where it stands. Take pictures as ever (the game's screenshot key).", Host.Small);
+            if (Time.unscaledTime > nextNear) { nextNear = Time.unscaledTime + 3f; near = Exhibit.Near(8); }
+            foreach (Exhibit.Thing thing in near)
+                if (GUILayout.Button(thing.Show + "   (" + (thing.Far >= 1000f ? (thing.Far / 1000f).ToString("F1") + " km" : thing.Far.ToString("F0") + " m") + " off, " + thing.Size.ToString("F0") + " m across)", GUILayout.ExpandWidth(true)))
+                    aloneSaid = Exhibit.Alone(thing.Name);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(new GUIContent("Only the air", "No ground or buildings: the craft, clouds, smoke and flames stay."))) aloneSaid = Exhibit.Alone("air");
+            if (GUILayout.Button(new GUIContent("Nothing solid", "Nor the craft: only what is in the air, clouds, smoke, flames."))) aloneSaid = Exhibit.Alone("nothing");
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Behind it", GUILayout.Width(70f));
+            foreach (string colour in new[] { "the sky", "grey", "black", "white", "blue" })
+                if (GUILayout.Button(colour)) aloneSaid = Exhibit.Sky(colour == "the sky" ? "" : colour);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(new GUIContent(Time.timeScale == 0f ? "Set the clock going" : "Stop the clock", "One moment, held, to be looked at from several sides (the picture goes on being drawn)."))) aloneSaid = Exhibit.Still(Time.timeScale == 0f ? "off" : "on");
+            if (GUILayout.Button("Everything back")) aloneSaid = Exhibit.Back();
+            GUILayout.EndHorizontal();
+            if (aloneSaid.Length > 0) GUILayout.Label(aloneSaid, Host.Small);
         }
 
 #if DEV
@@ -343,6 +516,9 @@ namespace PhotoStudio
             string said = Running.Open();
             return said + "; " + (Running.stage != null ? Running.stage.Where : "");
         }
+
+        /// <summary>(For the development build: the showroom floor's blur looked into; see Stage.HazeTest.)</summary>
+        public static string Haze(string what) => Running != null && Running.stage != null ? Running.stage.HazeTest(what) : "not open";
 
         public static string Shut()
         {
@@ -371,8 +547,17 @@ namespace PhotoStudio
             bool see = Array.IndexOf(parts, "clear") >= 0;
             var watch = System.Diagnostics.Stopwatch.StartNew();
             Running.stage.Settle();
-            string path = Picture.Take(Running.stage, times, see && Running.stage.Kind != 2, CraftName(), Named[Running.stage.Kind]);
+            string path = Picture.Take(Running.stage, times, see && Running.stage.Kind < 2, CraftName(), Named[Running.stage.Kind]);
             return path + " (" + watch.ElapsedMilliseconds + " ms)";
+        }
+
+        /// <summary>(For the development build: the turntable's loop begun (Loop); "said" afterwards: what was last saved.)</summary>
+        public static string LoopNow(string what)
+        {
+            if (Running == null || Running.stage == null) return "not open";
+            if ((what ?? "").Trim() == "said") return (Running.shooting ? "still making it; " : "") + "last saved: " + (Running.lastPicture ?? "nothing");
+            Running.Loop();
+            return "begun";
         }
 
         /// <summary>(For the development build: the white studio with the game's post-processing kept, or held off as it ships.)</summary>

@@ -149,7 +149,9 @@ namespace PhotoStudio
         /// </summary>
         void BeginFlight(int kind)
         {
-            Kind = Mathf.Clamp(kind, 0, 2);
+            Kind = Mathf.Clamp(kind, 0, 4);
+            FitBackdrop(true);                                  // (your picture's drawing taken off, until that studio is built)
+            NoHaze();
             Vector3 up = ((Vector3)FlightGlobals.getUpAxis(vessel.mainBody, vessel.CoMD)).normalized;
             Vector3 along = Vector3.ProjectOnPlane(Eye.transform.forward, up);
             if (along.sqrMagnitude < 1e-4f) along = Vector3.ProjectOnPlane(vessel.mainBody.transform.up, up);
@@ -195,7 +197,9 @@ namespace PhotoStudio
 
         void Begin(int kind)
         {
-            Kind = Mathf.Clamp(kind, 0, 2);
+            Kind = Mathf.Clamp(kind, 0, 4);
+            FitBackdrop(true);                                  // (your picture's drawing taken off, until that studio is built)
+            NoHaze();
             if (!Measure()) throw new Exception("nothing of the craft can be seen");
 
             // ---- the editor's camera: its own driver stops; the studio moves it until it is closed
@@ -298,15 +302,36 @@ namespace PhotoStudio
             scaleNow = ScaleFor(distanceNow, pitchNow, heightNow);
             // (the light from all round, set again just before the studio's two cameras draw: in flight another mod sets its own every frame)
             Camera.onPreCull += BeforeDrawing;
+            Camera.onPreRender += JustBeforeDrawing;
             hooked = true;
             Place(0f);
         }
 
         bool hooked;
 
+        /// <summary>
+        /// The showroom floor's blur laid out for the picture the camera is about to draw (the screen's, or a larger one), as the camera
+        /// stands for it and with the lens it draws with, at the last moment before it draws: see Haze.
+        /// </summary>
+        void JustBeforeDrawing(Camera cam)
+        {
+            if (closed || cam != Eye || hazeFloor == null) return;
+#if DEV
+            Matrix4x4 m = cam.projectionMatrix; lensAtDraw = new Vector4(m.m00, m.m11, m.m02, m.m12);
+#endif
+            HazeAt(cam);
+        }
+#if DEV
+        Vector4 lensAtCull, lensAtDraw;
+#endif
+
         void BeforeDrawing(Camera cam)
         {
-            if (closed || cam == null || (cam != Eye && cam != Back) || !haveProbe) return;
+            if (closed || cam == null || (cam != Eye && cam != Back)) return;
+#if DEV
+            if (cam == Eye) { Matrix4x4 m = cam.projectionMatrix; lensAtCull = new Vector4(m.m00, m.m11, m.m02, m.m12); }
+#endif
+            if (!haveProbe) return;
             RenderSettings.ambientMode = AmbientMode.Custom;
             RenderSettings.ambientProbe = probeMade;
             if (seen != null)
@@ -433,7 +458,9 @@ namespace PhotoStudio
             built = new Made();
             backdrop.Clear();
             shadowShown = null; shadowPaint = null; shade = null; floor = null; screenPaint = null;
-            Kind = Mathf.Clamp(kind, 0, 2);
+            Kind = Mathf.Clamp(kind, 0, 4);
+            FitBackdrop(true);                                  // (your picture's drawing taken off, until that studio is built)
+            NoHaze();
 
             set = new GameObject("Photo Studio set").transform;
             set.SetParent(root.transform, false);
@@ -449,13 +476,18 @@ namespace PhotoStudio
             {
                 case 0: White(); break;
                 case 1: Green(); break;
+                case 3: YourPicture(); break;
+                case 4: Outdoors(); break;
                 default: Showroom(); break;
             }
             Reflections();
         }
 
         /// <summary>A light of the studio's, for the craft only. `from` is where it shines from, seen from the craft, with +z away from the camera and +y up.</summary>
-        Light Lamp(string name, Vector3 from, float intensity, bool shadows)
+        Light Lamp(string name, Vector3 from, float intensity, bool shadows) => Lamp(name, from, intensity, shadows, new Color(1f, 0.985f, 0.96f), false);
+
+        /// <summary>(Since 0.2.0.) A light of the studio's in a colour of its own, its shadows soft or hard, lighting the set's ground as well where asked.</summary>
+        Light Lamp(string name, Vector3 from, float intensity, bool shadows, Color colour, bool hard, bool ground = false)
         {
             var thing = new GameObject("Photo Studio " + name);
             thing.transform.SetParent(set, false);
@@ -463,10 +495,10 @@ namespace PhotoStudio
             thing.transform.localRotation = Quaternion.LookRotation(going, Mathf.Abs(going.y) > 0.95f ? Vector3.forward : Vector3.up);
             var lamp = thing.AddComponent<Light>();
             lamp.type = LightType.Directional;
-            lamp.color = new Color(1f, 0.985f, 0.96f);
+            lamp.color = colour;
             lamp.intensity = intensity;
-            lamp.cullingMask = 1 << Parts;
-            lamp.shadows = shadows && QualitySettings.shadows != ShadowQuality.Disable ? LightShadows.Soft : LightShadows.None;
+            lamp.cullingMask = ground ? (1 << Parts) | (1 << SetLayer) : 1 << Parts;
+            lamp.shadows = shadows && QualitySettings.shadows != ShadowQuality.Disable ? (hard ? LightShadows.Hard : LightShadows.Soft) : LightShadows.None;
             lamp.shadowStrength = 0.75f;
             lamp.renderMode = LightRenderMode.ForcePixel;
             return lamp;
@@ -486,8 +518,12 @@ namespace PhotoStudio
         readonly List<KeyValuePair<Vector3, float>> lobes = new List<KeyValuePair<Vector3, float>>();
         float probedAt = float.NaN;
 
+        // (since 0.2.0: the light from above and from below in a colour, outdoors and at sunset: the sky's blue, the ground's own)
+        Color aboveTint = Color.white, belowTint = Color.white;
+
         void Surround(float all, float above, float below, params KeyValuePair<Vector3, float>[] broad)
         {
+            aboveTint = Color.white; belowTint = Color.white;
             allRound = all; fromAbove = above; fromBelow = below;
             lobes.Clear();
             lobes.AddRange(broad);
@@ -509,8 +545,8 @@ namespace PhotoStudio
             var probe = new SphericalHarmonicsL2();
             // (the probe is light as it is, not as it is shown: the shown values here are made linear first)
             probe.AddAmbientLight(Grey(allRound));
-            if (fromAbove > 0f) probe.AddDirectionalLight(Up, Grey(fromAbove), 1f);
-            if (fromBelow > 0f) probe.AddDirectionalLight(-Up, Grey(fromBelow), 1f);
+            if (fromAbove > 0f) probe.AddDirectionalLight(Up, Grey(fromAbove) * aboveTint.linear, 1f);
+            if (fromBelow > 0f) probe.AddDirectionalLight(-Up, Grey(fromBelow) * belowTint.linear, 1f);
             foreach (KeyValuePair<Vector3, float> lobe in lobes)
                 if (lobe.Value > 0f) probe.AddDirectionalLight(turn * lobe.Key, Grey(lobe.Value), 1f);
             RenderSettings.ambientMode = AmbientMode.Custom;
@@ -539,14 +575,18 @@ namespace PhotoStudio
             backdrop.Add(Workshop.Piece("white cove", set, cove, paint, SetLayer).GetComponent<Renderer>());
             Back.backgroundColor = white;
             Shadow(Studio.ShadowStrength);
-            var key = new Vector3(-0.55f, 0.62f, -0.56f);
-            Lamp("key", key, K("w.key", 1.0f), true);
-            Lamp("fill", new Vector3(0.8f, 0.3f, -0.52f), K("w.fill", 0.18f), false);
-            Lamp("top", new Vector3(0f, 1f, 0.15f), K("w.top", 0.2f), false);
-            Lamp("rim left", new Vector3(-0.6f, 0.45f, 0.66f), K("w.rim", 0.18f), false);
-            Lamp("rim right", new Vector3(0.6f, 0.45f, 0.66f), K("w.rim", 0.18f), false);
-            // (a white room: light from everywhere, from the white floor below, and broadly from the big softbox of the key)
-            Surround(K("w.all", 0.34f), K("w.above", 0.2f), K("w.below", 0.3f), Lobe(key, K("w.lobe", 0.22f)));
+            if (Studio.LightLook == 0)
+            {
+                var key = new Vector3(-0.55f, 0.62f, -0.56f);
+                Lamp("key", key, K("w.key", 1.0f), true);
+                Lamp("fill", new Vector3(0.8f, 0.3f, -0.52f), K("w.fill", 0.18f), false);
+                Lamp("top", new Vector3(0f, 1f, 0.15f), K("w.top", 0.2f), false);
+                Lamp("rim left", new Vector3(-0.6f, 0.45f, 0.66f), K("w.rim", 0.18f), false);
+                Lamp("rim right", new Vector3(0.6f, 0.45f, 0.66f), K("w.rim", 0.18f), false);
+                // (a white room: light from everywhere, from the white floor below, and broadly from the big softbox of the key)
+                Surround(K("w.all", 0.34f), K("w.above", 0.2f), K("w.below", 0.3f), Lobe(key, K("w.lobe", 0.22f)));
+            }
+            else Looked(0.3f);
             // (the game's post-processing would make a white backdrop glow over the craft's edges, and where it can measure
             // the picture (on Direct3D) turn the white down to grey: held off here as for the green screen)
             if (!ProcessWhite) Unprocessed();
@@ -578,6 +618,139 @@ namespace PhotoStudio
             // (neutral light from all round: nothing of the green comes back onto the craft)
             Surround(K("g.all", 0.3f), K("g.above", 0.12f), K("g.below", 0.04f), Lobe(key, K("g.lobe", 0.18f)));
             Unprocessed();
+        }
+
+        /// <summary>
+        /// (Since 0.2.0.) The player's own picture behind the craft: drawn by the backdrop camera straight onto its frame before the
+        /// craft is drawn over it, filling the frame with the picture's middle kept (cut at the sides or at top and bottom, never
+        /// stretched); the craft lit as in the white studio but for the white room's own light, and its soft shadow lying on the
+        /// floor under it, darkening the picture there (so a picture with ground at the craft's foot takes it as its own); the
+        /// game's post-processing held off, so the picture keeps its own colours. A grey ground where there is no picture yet.
+        /// </summary>
+        void YourPicture()
+        {
+            Back.backgroundColor = new Color(0.5f, 0.5f, 0.5f, 1f);
+            backdropPicture = Studio.Backdrop();
+            FitBackdrop(true);
+            Shadow(Studio.ShadowStrength);
+            if (Studio.LightLook == 0)
+            {
+                var key = new Vector3(-0.55f, 0.62f, -0.56f);
+                Lamp("key", key, K("p.key", 1.0f), true);
+                Lamp("fill", new Vector3(0.8f, 0.3f, -0.52f), K("p.fill", 0.22f), false);
+                Lamp("top", new Vector3(0f, 1f, 0.15f), K("p.top", 0.15f), false);
+                Lamp("rim left", new Vector3(-0.6f, 0.45f, 0.66f), K("p.rim", 0.22f), false);
+                Lamp("rim right", new Vector3(0.6f, 0.45f, 0.66f), K("p.rim", 0.22f), false);
+                Surround(K("p.all", 0.32f), K("p.above", 0.18f), K("p.below", 0.08f), Lobe(key, K("p.lobe", 0.2f)));
+            }
+            else Looked(0.1f);
+            Unprocessed();
+        }
+
+        CommandBuffer backdropDraw;
+        Texture2D backdropPicture;
+        float backdropAspect = -1f;
+
+        /// <summary>Your picture's drawing onto the backdrop camera's frame, made for the frame's shape (again when that changes); taken off in any other studio.</summary>
+        void FitBackdrop(bool anew)
+        {
+            if (Back == null) return;
+            float aspect = Back.pixelHeight > 0 ? (float)Back.pixelWidth / Back.pixelHeight : 16f / 9f;
+            if (!anew && backdropDraw != null && Mathf.Abs(aspect - backdropAspect) < 0.001f) return;
+            backdropAspect = aspect;
+            if (backdropDraw != null) { Back.RemoveCommandBuffer(CameraEvent.BeforeForwardOpaque, backdropDraw); backdropDraw.Release(); backdropDraw = null; }
+            if (Kind != 3 || backdropPicture == null) return;
+            float own = (float)backdropPicture.width / Mathf.Max(1, backdropPicture.height);
+            // (the part of the picture shown: all of its height and the middle of its width, or the other way round)
+            var scale = own > aspect ? new Vector2(aspect / own, 1f) : new Vector2(1f, own / aspect);
+            var offset = new Vector2(0.5f * (1f - scale.x), 0.5f * (1f - scale.y));
+            backdropDraw = new CommandBuffer { name = "Photo Studio: your picture" };
+            backdropDraw.Blit(backdropPicture, BuiltinRenderTextureType.CameraTarget, scale, offset);
+            Back.AddCommandBuffer(CameraEvent.BeforeForwardOpaque, backdropDraw);
+        }
+
+        /// <summary>
+        /// (Since 0.2.0.) The lights for the look chosen other than soft (Studio.LightLook), in the white studio and before your
+        /// picture; `room` is how much light the set itself gives back from all round (a white room much, a picture little).
+        /// Hard: one small strong light high to the side, its shadows hard-edged, and little fill, as bright sun. Low-key: the key
+        /// from the side and a little behind, no fill, two strong lights from behind drawing the outline, the rest dark. Sunset: a
+        /// low warm key from the side and in front, the blue of the sky from above, as the sun near setting lights things.
+        /// </summary>
+        void Looked(float room)
+        {
+            var warmWhite = new Color(1f, 0.985f, 0.96f);
+            switch (Studio.LightLook)
+            {
+                case 1:
+                    Lamp("key", new Vector3(-0.62f, 0.62f, -0.48f), K("h.key", 1.35f), true, warmWhite, true);
+                    Lamp("fill", new Vector3(0.8f, 0.3f, -0.52f), K("h.fill", 0.08f), false);
+                    Surround(room * 0.4f + 0.08f, K("h.above", 0.12f), room * 0.3f);
+                    break;
+                case 2:
+                    var left = new Vector3(-0.75f, 0.4f, 0.52f);
+                    var right = new Vector3(0.75f, 0.4f, 0.52f);
+                    Lamp("key", new Vector3(-0.92f, 0.3f, 0.2f), K("l.key", 0.95f), true);
+                    Lamp("rim left", left, K("l.rim", 0.6f), false);
+                    Lamp("rim right", right, K("l.rim", 0.6f), false);
+                    Surround(room * 0.15f, K("l.above", 0.04f), 0f, Lobe(left, K("l.lobe", 0.05f)), Lobe(right, K("l.lobe", 0.05f)));
+                    break;
+                default:
+                    Lamp("key", new Vector3(-0.78f, 0.22f, -0.58f), K("t.key", 1.25f), true, new Color(1f, 0.68f, 0.42f), false);
+                    Lamp("sky", new Vector3(0.2f, 1f, 0.1f), K("t.sky", 0.2f), false, new Color(0.55f, 0.68f, 1f), false);
+                    Lamp("rim", new Vector3(0.7f, 0.3f, 0.6f), K("t.rim", 0.12f), false, new Color(1f, 0.8f, 0.6f), false);
+                    Surround(room * 0.5f + 0.1f, K("t.above", 0.16f), room * 0.3f);
+                    aboveTint = new Color(0.62f, 0.74f, 1f); belowTint = new Color(1f, 0.85f, 0.7f);
+                    probedAt = float.NaN; Probe();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// (Since 0.2.0.) Outdoors: the craft on a concrete apron under the open sky in sunshine. The sun a small strong light
+        /// high to the side, warm white, casting the craft's own shadow on the ground (the ground lit by the game's own lit
+        /// shader, the one thing of the sets that takes light and shadow); the sky a dome from a pale haze at the horizon to blue
+        /// overhead, its light from above blue and from below the concrete's own grey; the apron in slabs four metres square, its
+        /// grain and joints for scale. With the light's look at sunset, the sun low and orange and the sky's light the stronger.
+        /// The game's post-processing is kept, as in the game.
+        /// </summary>
+        void Outdoors()
+        {
+            bool low = Studio.LightLook == 3;
+            float reach = 3.2f * room;
+            // the sky: a dome, haze at the horizon to blue overhead
+            var dome = new List<Vector2>();
+            for (int i = 0; i <= 24; i++) { float a = 0.5f * Mathf.PI * i / 24f; dome.Add(new Vector2(reach * Mathf.Cos(a), reach * Mathf.Sin(a))); }
+            Texture2D sky = low
+                ? Workshop.Ramp(built, new[] { 0f, 0.08f, 0.35f, 1f }, new[] { new Color(1f, 0.72f, 0.5f), new Color(0.95f, 0.75f, 0.62f), new Color(0.55f, 0.62f, 0.78f), new Color(0.28f, 0.38f, 0.62f) })
+                : Workshop.Ramp(built, new[] { 0f, 0.06f, 0.4f, 1f }, new[] { new Color(0.82f, 0.86f, 0.9f), new Color(0.72f, 0.8f, 0.9f), new Color(0.48f, 0.64f, 0.86f), new Color(0.3f, 0.48f, 0.8f) });
+            backdrop.Add(Workshop.Piece("sky", set, Workshop.Turned(built, dome, 96, "sky"), Workshop.Flat(built, sky, Color.white, "sky"), SetLayer).GetComponent<Renderer>());
+            // the ground: an apron of concrete slabs out to the horizon, lit and shadowed
+            Mesh apron = Workshop.Floor(built, reach, 30, 96, "apron");
+            Vector3[] at = apron.vertices;
+            var uv = new Vector2[at.Length];
+            var white = new Color32[at.Length];
+            for (int i = 0; i < at.Length; i++) { uv[i] = new Vector2(at[i].x / 4f, at[i].z / 4f); white[i] = new Color32(255, 255, 255, 255); }
+            apron.uv = uv;
+            apron.colors32 = white;                             // (the floor's points come black, for the showroom's gloss)
+            Shader lit = null;
+            foreach (string name in new[] { "KSP/Diffuse", "Legacy Shaders/Diffuse", "Diffuse" }) { Shader found = Shader.Find(name); if (found != null && found.isSupported) { lit = found; break; } }
+            Material concrete = built.Keep(new Material(lit != null ? lit : Shaders.Flat) { name = "Photo Studio apron" });
+            concrete.mainTexture = Workshop.Concrete(built);
+            if (concrete.HasProperty(Workshop.Colour)) concrete.SetColor(Workshop.Colour, Color.white);
+            GameObject ground = Workshop.Piece("apron", set, apron, concrete, SetLayer);
+            var drawn = ground.GetComponent<MeshRenderer>();
+            drawn.receiveShadows = true;
+            backdrop.Add(drawn);
+            Back.backgroundColor = new Color(0.82f, 0.86f, 0.9f);
+            // the sun, and the sky's light
+            Vector3 sun = low ? new Vector3(-0.78f, 0.2f, -0.58f) : new Vector3(-0.62f, 0.72f, -0.32f);
+            Lamp("sun", sun, K("o.sun", low ? 1.25f : 1.35f), true, low ? new Color(1f, 0.66f, 0.38f) : new Color(1f, 0.96f, 0.88f), false, true);
+            Lamp("sky", new Vector3(0.15f, 1f, 0.2f), K("o.sky", low ? 0.2f : 0.14f), false, new Color(0.55f, 0.68f, 1f), false);
+            // (at sunset the sky's light is the greater part of what lights the ground, and warm low down: the ground no longer a dim purple)
+            Surround(K("o.all", low ? 0.36f : 0.26f), K("o.above", low ? 0.3f : 0.26f), K("o.below", 0.14f));
+            aboveTint = low ? new Color(0.86f, 0.78f, 0.86f) : new Color(0.62f, 0.76f, 1f);
+            belowTint = new Color(0.95f, 0.92f, 0.86f);
+            probedAt = float.NaN; Probe();
         }
 
         /// <summary>The game's post-processing (TUFX, where installed) held off while this studio is up.</summary>
@@ -620,7 +793,9 @@ namespace PhotoStudio
             floor = Workshop.Floor(built, flat * 1.004f, 26, 96, "showroom floor");
             floorAt = floor.vertices;
             floorColour = floor.colors32;
-            backdrop.Add(Workshop.Piece("showroom floor", set, floor, Workshop.Blended(built, Workshop.Solid(built, Color.white), "showroom floor"), SetLayer).GetComponent<Renderer>());
+            Material floorPaint = Workshop.Blended(built, Workshop.Solid(built, Color.white), "showroom floor");
+            backdrop.Add(Workshop.Piece("showroom floor", set, floor, floorPaint, SetLayer).GetComponent<Renderer>());
+            Haze(floorPaint, flat * 1.004f);
 
             // the softbox overhead, facing down
             Texture2D diffuser = Workshop.Softbox(built, 128, 96, 0.035f);
@@ -675,6 +850,195 @@ namespace PhotoStudio
             Lamp("rim right", right, K("s.rim", 0.62f), false);
             // (a dark room: a little light from everywhere, the overhead softbox broadly from above, and the strip lights from behind)
             Surround(K("s.all", 0.12f), K("s.above", 0.24f), 0f, Lobe(left, K("s.lobe", 0.1f)), Lobe(right, K("s.lobe", 0.1f)));
+        }
+
+        // ---- (since 0.2.0) the showroom floor's reflection blurred as a real floor blurs it
+        const int HazeAcross = 96, HazeUp = 54;          // (the blurred floor's cells across the picture and up it)
+        Mesh hazeFloor;
+        Renderer hazeShown;
+        Vector3[] hazeAt;
+        Color32[] hazeColour;
+        Bounds hazeBounds;
+        float hazeRadius;
+        RenderTexture hazeHalf, hazeQuarter, hazeEighth;
+        CommandBuffer hazeDraw;
+        Material hazePaint;
+        // (copied once the backdrop camera has drawn everything of its own, see-through things too, and before it is done: copied after
+        // everything, the "picture" was the screen as the last frame left it, the finished picture with its strip lights and its own blur
+        // in it, so that the floor showed the lamps themselves, moved and stretched, beside their reflections: with HDR the camera draws
+        // into a picture of its own, and is on the screen only when it is done)
+        CameraEvent hazeWhen = CameraEvent.AfterForwardAlpha;
+
+        /// <summary>
+        /// A real polished floor is never quite a mirror: its surface is wavy and fine-scratched at a scale too small to see,
+        /// and each point of it sends back light from a little cone of directions, so what is reflected is blurred by as much
+        /// as it is far from the floor, sharp where a thing stands on it and softer the higher up the thing it shows (the
+        /// Limits page: "mirror-sharp" until 0.2.0). Here: the reflection, as the backdrop camera has drawn it, is copied and
+        /// blurred (made smaller three times and larger again, with the game's own copying), and laid over the sharp one on a
+        /// second floor whose every point takes the blurred picture from where it stands on the screen, more of it the further
+        /// that point is from the craft's foot (a higher thing's reflection lies further out): none at the foot, the most
+        /// from as far out as the craft is tall. The lacquer's gloss (the setting) keeps more of it sharp.
+        /// </summary>
+        void Haze(Material over, float radius)
+        {
+            // (That second floor is a grid over the picture, let down onto the floor afresh for every picture the camera draws (see
+            // HazeAt): each of its points knows exactly where on the picture it is, and the card, which fills in between them as if in
+            // perspective, is out by no more than a little of a cell. Laid out by rings round the craft, as the floor itself is, its
+            // cells were hundreds of pixels across in front of a low camera, and what it filled in between their corners as places on
+            // the picture was out by as much as they were large.)
+            hazeRadius = radius;
+            int nx = HazeAcross + 1, ny = HazeUp + 1;
+            hazeAt = new Vector3[nx * ny];
+            hazeColour = new Color32[nx * ny];
+            var onPicture = new Vector2[nx * ny];
+            for (int j = 0; j < ny; j++)
+                for (int i = 0; i < nx; i++) onPicture[j * nx + i] = new Vector2(i / (float)HazeAcross, j / (float)HazeUp);
+            var corners = new int[HazeAcross * HazeUp * 6];
+            int c = 0;
+            for (int j = 0; j < HazeUp; j++)
+                for (int i = 0; i < HazeAcross; i++)
+                {
+                    // (each cell's two halves turning clockwise as the camera sees them: the side that faces it)
+                    int a = j * nx + i, b = a + 1, d = a + nx, e = d + 1;
+                    corners[c++] = a; corners[c++] = e; corners[c++] = b;
+                    corners[c++] = a; corners[c++] = d; corners[c++] = e;
+                }
+            hazeFloor = built.Keep(new Mesh { name = "Photo Studio showroom floor's blur" });
+            hazeFloor.MarkDynamic();
+            hazeFloor.vertices = hazeAt;
+            hazeFloor.uv = onPicture;
+            hazeFloor.colors32 = hazeColour;
+            hazeFloor.triangles = corners;
+            hazeBounds = new Bounds(Vector3.zero, new Vector3(2.2f * radius, 1f, 2.2f * radius));
+            hazeFloor.bounds = hazeBounds;
+            int w = Mathf.Max(8, Back.pixelWidth / 2), h = Mathf.Max(8, Back.pixelHeight / 2);
+            hazeHalf = built.Keep(new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32) { name = "Photo Studio floor blur 1", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp });
+            hazeQuarter = built.Keep(new RenderTexture(Mathf.Max(4, w / 2), Mathf.Max(4, h / 2), 0, RenderTextureFormat.ARGB32) { name = "Photo Studio floor blur 2", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp });
+            hazeEighth = built.Keep(new RenderTexture(Mathf.Max(2, w / 4), Mathf.Max(2, h / 4), 0, RenderTextureFormat.ARGB32) { name = "Photo Studio floor blur 3", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp });
+            Material paint = Workshop.Blended(built, hazeHalf, "showroom floor's blur");
+            hazePaint = paint;
+            // (drawn after the backdrop camera's reflection and before the floor's own colour is laid over both)
+            paint.renderQueue = over.renderQueue - 1;
+            hazeShown = Workshop.Piece("showroom floor's blur", set, hazeFloor, paint, SetLayer).GetComponent<Renderer>();
+            backdrop.Add(hazeShown);
+            hazeDraw = new CommandBuffer { name = "Photo Studio: the floor's reflection blurred" };
+            hazeDraw.Blit(BuiltinRenderTextureType.CameraTarget, hazeHalf);
+            hazeDraw.Blit(hazeHalf, hazeQuarter);
+            hazeDraw.Blit(hazeQuarter, hazeEighth);
+            hazeDraw.Blit(hazeEighth, hazeQuarter);
+            hazeDraw.Blit(hazeQuarter, hazeHalf);
+            Back.AddCommandBuffer(hazeWhen, hazeDraw);
+        }
+
+        void NoHaze()
+        {
+            if (hazeDraw != null) { if (Back != null) Back.RemoveCommandBuffer(hazeWhen, hazeDraw); hazeDraw.Release(); hazeDraw = null; }
+            hazeFloor = null; hazeShown = null; hazeAt = null; hazeColour = null; hazePaint = null;
+        }
+
+#if DEV
+        int hazeTest;                                   // (1: the blur laid over the whole floor at full strength, to see what it holds)
+
+        /// <summary>
+        /// (development build) The showroom floor's blur looked into: "say" the sizes and the cameras' targets; "copy" what the blur
+        /// holds laid over the floor at full strength; "solid" a gradient in its place (red across the picture, green up it), to read
+        /// from a screenshot where on the picture each point of the floor takes its blur from; "alpha" / "everything" when the
+        /// backdrop camera's picture is copied (after its see-through things, or after everything); "off" as it ships.
+        /// </summary>
+        public string HazeTest(string arg)
+        {
+            string a = (arg ?? "").Trim();
+            if (hazeFloor == null || hazePaint == null) return "no blur: not the showroom";
+            if (a == "copy" || a == "solid") { hazeTest = 1; hazePaint.mainTexture = a == "copy" ? (Texture)hazeHalf : Gradient(); }
+            else if (a == "off") { hazeTest = 0; hazePaint.mainTexture = hazeHalf; }
+            else if (a == "alpha" || a == "everything")
+            {
+                Back.RemoveCommandBuffer(hazeWhen, hazeDraw);
+                hazeWhen = a == "alpha" ? CameraEvent.AfterForwardAlpha : CameraEvent.AfterEverything;
+                Back.AddCommandBuffer(hazeWhen, hazeDraw);
+            }
+            return "screen " + Screen.width + "x" + Screen.height + ", back " + Back.pixelRect + " into " + (Back.targetTexture != null ? Back.targetTexture.name : "the screen") + " (hdr " + Back.allowHDR + ", msaa " + Back.allowMSAA +
+                   ", path " + Back.actualRenderingPath + "), eye " + Eye.pixelRect + " into " + (Eye.targetTexture != null ? Eye.targetTexture.name : "the screen") + " (hdr " + Eye.allowHDR + ", msaa " + Eye.allowMSAA + ", clears " + Eye.clearFlags +
+                   "), lens before culling " + lensAtCull.ToString("F3") + ", before drawing " + lensAtDraw.ToString("F3") + " (fov " + Eye.fieldOfView.ToString("F2") + ", aspect " + Eye.aspect.ToString("F3") + ", unjittered m11 " + Eye.nonJitteredProjectionMatrix.m11.ToString("F3") +
+                   "), antialiasing " + QualitySettings.antiAliasing + ", blur " + hazeHalf.width + "x" + hazeHalf.height + " copied " + hazeWhen + ", test " + hazeTest + ", display " + Display.main.renderingWidth + "x" + Display.main.renderingHeight + " of " + Display.main.systemWidth + "x" + Display.main.systemHeight;
+        }
+
+        Texture2D gradient;
+        Texture2D Gradient()
+        {
+            if (gradient != null) return gradient;
+            gradient = built.Keep(new Texture2D(64, 64, TextureFormat.RGBA32, false) { name = "Photo Studio blur test", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear });
+            var pixels = new Color32[64 * 64];
+            for (int y = 0; y < 64; y++)
+                for (int x = 0; x < 64; x++) pixels[y * 64 + x] = new Color32((byte)(x * 255 / 63), (byte)(y * 255 / 63), 0, 255);
+            gradient.SetPixels32(pixels);
+            gradient.Apply(false, false);
+            return gradient;
+        }
+#endif
+
+        /// <summary>
+        /// The blurred floor laid out for the picture the camera is about to draw: each point of the grid over the picture let down
+        /// from the camera onto the floor, and how much of the blur it lays over the sharp reflection there. A point that looks at no
+        /// floor (above the horizon, or past the floor's edge) is put with the nearest one of its column that does, and the cells
+        /// between them come to nothing.
+        /// </summary>
+        void HazeAt(Camera cam)
+        {
+            float gloss = Mathf.Clamp01(Studio.Gloss), most = Mathf.Lerp(1f, 0.45f, gloss);
+            float foot0 = 0.5f * across + 0.1f, reach = Mathf.Max(1f, 1.1f * tall), s = scaleNow;
+            // (the camera's rays in the set's own room, where the floor is the level at nought, in plain arithmetic: five thousand calls
+            // into the game a frame would cost a millisecond. A ray through the picture at x across and y up, each from -1 to 1, goes
+            // along middle + x alongX + y alongY, the lens's own matrix giving the angles, off centre too if it is)
+            Matrix4x4 lens = cam.projectionMatrix, toSet = set.worldToLocalMatrix * cam.cameraToWorldMatrix;
+            Vector3 from = toSet.MultiplyPoint3x4(Vector3.zero);
+            Vector3 alongX = toSet.MultiplyVector(new Vector3(1f / lens.m00, 0f, 0f));
+            Vector3 alongY = toSet.MultiplyVector(new Vector3(0f, 1f / lens.m11, 0f));
+            Vector3 middle = toSet.MultiplyVector(new Vector3(lens.m02 / lens.m00, lens.m12 / lens.m11, -1f));
+            int nx = HazeAcross + 1, ny = HazeUp + 1;
+            float r2 = hazeRadius * hazeRadius;
+            var none = new Color32(255, 255, 255, 0);
+            for (int i = 0; i < nx; i++)
+            {
+                Vector3 column = middle + alongX * (2f * i / HazeAcross - 1f);
+                int first = -1, last = -1;
+                for (int j = 0; j < ny; j++)
+                {
+                    int n = j * nx + i;
+                    Vector3 way = column + alongY * (2f * j / HazeUp - 1f);
+                    float x = 0f, z = 0f;
+                    bool floorThere = false;
+                    if (from.y > 0f && way.y < 0f)
+                    {
+                        float t = -from.y / way.y;
+                        x = from.x + way.x * t; z = from.z + way.z * t;
+                        floorThere = x * x + z * z <= r2;
+                    }
+                    if (floorThere)
+                    {
+                        hazeAt[n] = new Vector3(x, 0f, z);
+                        float out1 = Mathf.Sqrt(x * x + z * z) * s - foot0;
+                        float k = most * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(out1 / reach));
+#if DEV
+                        if (hazeTest > 0) k = 1f;
+#endif
+                        hazeColour[n] = new Color32(255, 255, 255, (byte)Mathf.Clamp(Mathf.RoundToInt(k * 255f), 0, 255));
+                        if (first < 0) first = n;
+                        last = n;
+                    }
+                    else
+                    {
+                        hazeAt[n] = last >= 0 ? hazeAt[last] : Vector3.zero;
+                        hazeColour[n] = none;
+                    }
+                }
+                // (the points under the first that looks at the floor, if any, with that one)
+                if (first > i)
+                    for (int n = i; n < first; n += nx) hazeAt[n] = hazeAt[first];
+            }
+            hazeFloor.vertices = hazeAt;
+            hazeFloor.colors32 = hazeColour;
+            hazeFloor.bounds = hazeBounds;
         }
 
         /// <summary>The soft shadow under the craft (worked out over the next frames; see Shade).</summary>
@@ -746,6 +1110,9 @@ namespace PhotoStudio
                 holder.transform.position = foot + Up * (0.5f * tall);
                 bool shadowWas = shadowShown != null && shadowShown.enabled;
                 if (shadowShown != null) shadowShown.enabled = false;
+                // (the floor's blur is laid out for the camera's picture alone: from the craft it would lie anywhere)
+                bool hazeWas = hazeShown != null && hazeShown.enabled;
+                if (hazeShown != null) hazeShown.enabled = false;
                 var hidden = new List<Renderer>();
                 if (SetLayer == Parts && CraftParts != null)
                     foreach (Part p in CraftParts)
@@ -758,6 +1125,7 @@ namespace PhotoStudio
                     RenderTexture.active = active;
                     foreach (Renderer r in hidden) if (r != null) r.forceRenderingOff = false;
                     if (shadowShown != null) shadowShown.enabled = shadowWas;
+                    if (hazeShown != null) hazeShown.enabled = hazeWas;
                     if (screenPaint != null) screenPaint.SetColor(Workshop.Colour, screen);
                     UnityEngine.Object.Destroy(holder);
                 }
@@ -836,6 +1204,9 @@ namespace PhotoStudio
             return others;
         }
 
+        /// <summary>(Since 0.2.0.) The camera's heading round the craft, degrees (the turntable turns it).</summary>
+        public float Heading => heading;
+
         /// <summary>Set the camera by hand: heading and pitch in degrees, distance and height in metres (NaN: as it is).</summary>
         public void Aim(float toHeading, float toPitch, float toDistance, float toHeight, bool now)
         {
@@ -904,7 +1275,8 @@ namespace PhotoStudio
                 if (!shade.Done) shade.Work(3f);
                 else if (shadeFade < 1f) { shadeFade = Mathf.Min(1f, shadeFade + (dt <= 0f ? 1f : dt * 2.5f)); SetShadowStrength(shadeFade); }
             }
-            if (Kind == 1 || (Kind == 0 && !ProcessWhite)) Unprocessed();
+            if (Kind == 1 || Kind == 3 || (Kind == 0 && !ProcessWhite)) Unprocessed();
+            if (Kind == 3) FitBackdrop(false);
             Focus();
         }
 
@@ -1016,7 +1388,9 @@ namespace PhotoStudio
         {
             if (closed) return;
             closed = true;
-            if (hooked) { Camera.onPreCull -= BeforeDrawing; hooked = false; }
+            if (hooked) { Camera.onPreCull -= BeforeDrawing; Camera.onPreRender -= JustBeforeDrawing; hooked = false; }
+            if (backdropDraw != null) { if (Back != null) Back.RemoveCommandBuffer(CameraEvent.BeforeForwardOpaque, backdropDraw); backdropDraw.Release(); backdropDraw = null; }
+            NoHaze();
             if (lens != null) { try { lens.Off(); } catch (Exception ex) { Debug.LogException(ex); } lens = null; }
             // (out of sight at once, this very frame: what is destroyed goes only at the frame's end)
             if (root != null) root.SetActive(false);
