@@ -8,7 +8,7 @@ see-through background if you want one. In the assembly building, in the hangar 
 
 ![A plane on the turntable in the dark showroom](src/PhotoStudio/img/photo-studio-turntable.gif)
 
-For Kerbal Space Program 1.12.x. **Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone) 0.9 or later**, a separate download
+For Kerbal Space Program 1.12.x. **Needs [Keystone](https://github.com/IshiakiZ/ksp-keystone) 0.11 or later**, a separate download
 ([on SpaceDock](https://spacedock.info/mod/4665/Keystone)): this mod does not load without it.
 
 ## Install
