@@ -7,7 +7,7 @@ using UnityEngine.EventSystems;
 
 #if !DEV
 [assembly: KSPAssembly("PhotoStudio", 0, 1)]
-[assembly: KSPAssemblyDependency("Keystone", 0, 4)]
+[assembly: KSPAssemblyDependency("Keystone", 0, 11)]
 #endif
 
 namespace PhotoStudio
@@ -28,7 +28,7 @@ namespace PhotoStudio
     [KSPAddon(KSPAddon.Startup.FlightAndEditor, false)]
     public sealed class Studio : MonoBehaviour
     {
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
         public static readonly string[] Studios = { "white", "green screen", "showroom", "your picture", "outdoors" };
         static readonly string[] Named = { "white studio", "green screen", "showroom", "your picture", "outdoors" };
         static readonly string[] Looks = { "soft", "hard", "low-key", "sunset" };
@@ -55,7 +55,7 @@ namespace PhotoStudio
         public static int LightLook => look != null ? look.Value : 0;
 
         /// <summary>Its key, as Keystone lists it (the studio's own keys, read only while it is open, are on its page).</summary>
-        static void Keys(Mod mod) => mod.Uses(KeyCode.P, true, "the studio, in the editors");
+        static void Keys(Mod mod) => mod.Uses(KeyCode.P, true, "the studio, in the editors and in flight; in it, with " + Key + " still held: S takes the picture, 1 to 5 the studio, T the turntable");
 
         public static void Setup()
         {
@@ -68,6 +68,12 @@ namespace PhotoStudio
             stop = mod.Slider("stop", "Aperture  f /", 16f, 1.4f, 16f, "", 1, "The lens's f-number, for depth of field: at 16 everything is sharp; open the lens wider (smaller numbers) and what is nearer or further than the craft is blurred, more the closer the camera and the longer the lens. Done by Keystone's lens (on Windows only where TUFX is installed); the craft is kept in focus.");
             side = mod.Choice("side", "Key light from the", 0, new[] { "left", "right" }, "Which side of the picture the main light comes from (and its shadows fall away from); the other lights go round with it.");
             look = mod.Choice("look", "The light", 0, Looks, "(0.2.0) In the white studio, your picture and outdoors. Soft: a large soft key with fill, top and rim lights, as products are photographed. Hard: one small strong light high to the side and little fill, as bright sun. Low-key: the key from the side and a little behind, no fill, strong lights from behind drawing the outline, the rest dark. Sunset: a low warm key from the side and blue light from the sky above (outdoors: the sun low and warm).");
+            Fine(true);
+            keyBy = mod.Slider("keylight", "Key light", 1f, 0.25f, 2f, "x", 2, "How strong the main light is (outdoors, the sun), against as each light has it.");
+            fillBy = mod.Slider("filllight", "Fill light", 1f, 0f, 3f, "x", 2, "How strong the soft light filling the shadows is (outdoors, the sky's), against as each light has it: 0, none, the hardest look.");
+            rimBy = mod.Slider("rimlight", "Rim and top lights", 1f, 0f, 3f, "x", 2, "How strong the lights from behind and above that pick out the craft's edges are, against as each light has it.");
+            selfShadow = mod.Slider("selfshadow", "How dark the craft's own shadows are", 0.75f, 0f, 1f, "", 2, "How dark the shadows the lights cast on the craft itself are: 0, none; 1, black.");
+            Fine(false);
             turning = mod.Toggle("turntable", "Turntable", false, "The craft turns slowly, as on a photographer's turntable: the camera, the lights and the set stay as they are.");
             spin = mod.Slider("spin", "Turntable speed", 8f, -40f, 40f, " ° a second", 1, "How fast the turntable turns; less than nought, the other way.");
             mod.Heading("Pictures");
@@ -80,6 +86,26 @@ namespace PhotoStudio
             gloss = mod.Slider("gloss", "Showroom floor gloss", 0.75f, 0f, 1f, "", 2, "How much the showroom's floor reflects: nought is matt, one is a mirror-like lacquer.");
             hide = mod.Toggle("hide", "Put the game's interface away", true, "While the studio is open the editor's own panels and buttons are put away (the studio closes with Option-P, Alt-P elsewhere, and the settings window opens with the modifier key and K as always).");
         }
+
+        // (the fine details, on the page in Keystone's Advanced view; each as installed does what the mod did before them)
+        static Slider keyBy, fillBy, rimBy, selfShadow;
+
+        /// <summary>How strong a lamp of the studio's is against as it was made, by its name: the key (outdoors the sun), the fill
+        /// (outdoors the sky's), the rims and the lights from above.</summary>
+        public static float LampTimes(string name)
+        {
+            Slider by = name == "key" || name == "sun" ? keyBy : name == "fill" || name == "sky" ? fillBy
+                      : name.StartsWith("rim") || name == "top" || name == "overhead" ? rimBy : null;
+            return by != null ? by.Value : 1f;
+        }
+
+        public static float SelfShadow => selfShadow != null ? selfShadow.Value : 0.75f;
+
+        /// <summary>The settings added after Fine(true) are fine details: on the page only in Keystone's Advanced view, until Fine(false).
+        /// (Keystone 0.11.0 has the two views; an older one has neither call, and shows the fine details with the rest.)</summary>
+        static void Fine(bool fine) { try { if (fine) Advanced(mod); else Simple(mod); } catch (Exception) { } }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] static void Advanced(Mod page) => page.Advanced();
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)] static void Simple(Mod page) => page.Simple();
 
         public static Studio Running { get; private set; }
 
@@ -100,6 +126,7 @@ namespace PhotoStudio
             screen.Changed += Rebuild;
             side.Changed += Rebuild;
             look.Changed += Rebuild;
+            foreach (Slider one in new[] { keyBy, fillBy, rimBy, selfShadow }) if (one != null) one.Changed += Rebuild;
             GameEvents.onEditorRestart.Add(Restarted);
             GameEvents.onEditorShipModified.Add(Modified);
             GameEvents.onEditorLoad.Add(Loaded);
@@ -120,6 +147,7 @@ namespace PhotoStudio
             if (screen != null) screen.Changed -= Rebuild;
             if (side != null) side.Changed -= Rebuild;
             if (look != null) look.Changed -= Rebuild;
+            foreach (Slider one in new[] { keyBy, fillBy, rimBy, selfShadow }) if (one != null) one.Changed -= Rebuild;
             GameEvents.onEditorRestart.Remove(Restarted);
             GameEvents.onEditorShipModified.Remove(Modified);
             GameEvents.onEditorLoad.Remove(Loaded);
@@ -158,6 +186,7 @@ namespace PhotoStudio
             if (stage != null) return "open";
             stage = Stage.Open(kind.Value, out string why);
             if (stage == null) { Tell(why); return why; }
+            AskShutters();
             Tell(Named[kind.Value] + ": right button to turn, wheel to come nearer, middle button to raise.  " + Key + "-1, 2, 3: the studios; " + Key + "-T: turntable; " + Key + "-" + Shutter + ": a picture; " + Key + "-P: close.", 8f);
             return "open";
         }
@@ -386,9 +415,57 @@ namespace PhotoStudio
             StartCoroutine(Shooting());
         }
 
+        // (a real camera's shutter as the picture is taken: one of a Nikon's, from Sonniss's libraries, where the mod has its
+        // recordings, read by Keystone's Sounds (Keystone 0.10.0); without them, or with an older Keystone, no sound, as before)
+        AudioSource shutter;
+        static readonly string[] Shutters = { "shutter-1", "shutter-2", "shutter-3" };
+        static bool shutterGone;
+
+        void Click()
+        {
+            if (shutterGone) return;
+            try { Recorded(Shutters[UnityEngine.Random.Range(0, Shutters.Length)]); }
+            catch (Exception) { shutterGone = true; }      // (a Keystone older than 0.10.0: no Sounds there)
+        }
+
+        /// <summary>The shutters asked for as the studio opens, so that the first picture's is there when it is taken (Keystone
+        /// reads one sound a frame).</summary>
+        static void AskShutters()
+        {
+            if (shutterGone) return;
+            try { AskEach(); }
+            catch (Exception) { shutterGone = true; }
+        }
+
+        static void AskEach() { foreach (string name in Shutters) Keystone.Sounds.Get("PhotoStudio", name, _ => { }); }
+#if DEV
+        /// <summary>(For the development build: how many shutters have been heard, there being no ears here.)</summary>
+        public static string Clicked() => clicks + " shutters heard";
+        static int clicks;
+#endif
+
+        void Recorded(string name)
+        {
+            Keystone.Sounds.Get("PhotoStudio", name, clip =>
+            {
+                if (clip == null || this == null) return;
+                if (shutter == null)
+                {
+                    shutter = gameObject.AddComponent<AudioSource>();
+                    shutter.playOnAwake = false; shutter.spatialBlend = 0f; shutter.dopplerLevel = 0f;
+                }
+                shutter.pitch = UnityEngine.Random.Range(0.97f, 1.03f);
+                shutter.PlayOneShot(clip, GameSettings.UI_VOLUME);
+#if DEV
+                clicks++;
+#endif
+            });
+        }
+
         IEnumerator Shooting()
         {
             shooting = true;
+            Click();
             Tell("Taking the picture...", 30f);
             yield return new WaitForEndOfFrame();
             try { Took(TakeNow()); }
@@ -549,6 +626,14 @@ namespace PhotoStudio
             Running.stage.Settle();
             string path = Picture.Take(Running.stage, times, see && Running.stage.Kind < 2, CraftName(), Named[Running.stage.Kind]);
             return path + " (" + watch.ElapsedMilliseconds + " ms)";
+        }
+
+        /// <summary>(For the development build: a picture taken as the player takes one, its shutter heard.)</summary>
+        public static string Snap()
+        {
+            if (Running == null || Running.stage == null) return "not open";
+            Running.Shoot();
+            return "taking it";
         }
 
         /// <summary>(For the development build: the turntable's loop begun (Loop); "said" afterwards: what was last saved.)</summary>

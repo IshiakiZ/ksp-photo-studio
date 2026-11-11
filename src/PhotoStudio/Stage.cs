@@ -496,10 +496,10 @@ namespace PhotoStudio
             var lamp = thing.AddComponent<Light>();
             lamp.type = LightType.Directional;
             lamp.color = colour;
-            lamp.intensity = intensity;
+            lamp.intensity = intensity * Studio.LampTimes(name);
             lamp.cullingMask = ground ? (1 << Parts) | (1 << SetLayer) : 1 << Parts;
             lamp.shadows = shadows && QualitySettings.shadows != ShadowQuality.Disable ? (hard ? LightShadows.Hard : LightShadows.Soft) : LightShadows.None;
-            lamp.shadowStrength = 0.75f;
+            lamp.shadowStrength = Studio.SelfShadow;
             lamp.renderMode = LightRenderMode.ForcePixel;
             return lamp;
         }

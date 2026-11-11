@@ -29,7 +29,8 @@ Press **Alt-P** (Option-P on a Mac), or press **Open the studio** on the mod's p
   **Escape** closes the studio.
 
 The mod's page has the lens, the aperture, the side the light comes from, the picture's size and the see-through
-background.
+background. With Keystone 0.11.0, four finer details in its Advanced view: the key light's, the fill light's and the rim
+lights' strength, and how dark the craft's own shadows are. [All of them](https://github.com/IshiakiZ/ksp-photo-studio/wiki/Settings).
 
 **Anything in the game, alone** (in flight, on the mod's page): the craft near by and the space centre's buildings, nearest
 first; pick one and everything else is taken away from the game's own cameras where it stands (or only the ground, or
